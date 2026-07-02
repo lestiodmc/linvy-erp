@@ -14,18 +14,22 @@
         }
     @endphp
 
-    <div class="py-8">
-        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <form method="POST" action="{{ $action }}" x-data="{ tab: 'general' }" class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div>
+        <div class="mx-auto max-w-5xl">
+            <form method="POST" action="{{ $action }}" x-data="{ tab: 'general' }" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 @csrf
                 @if($method !== 'POST')
                     @method($method)
                 @endif
 
-                <div class="border-b border-gray-200 px-6 pt-5">
-                    <nav class="-mb-px flex gap-6" aria-label="Tabs">
+                <div class="border-b border-slate-100 px-6 pt-5">
+                    <div class="mb-5">
+                        <h3 class="text-base font-black text-slate-950">Category Information</h3>
+                        <p class="mt-1 text-sm text-slate-500">Manage item classification and optional accounting defaults.</p>
+                    </div>
+                    <nav class="-mb-px flex gap-6 overflow-x-auto" aria-label="Tabs">
                         @foreach($groups as $key => $group)
-                            <button type="button" @click="tab = '{{ $key }}'" :class="tab === '{{ $key }}' ? 'border-emerald-700 text-emerald-700' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'" class="whitespace-nowrap border-b-2 px-1 pb-4 text-sm font-semibold">
+                            <button type="button" @click="tab = '{{ $key }}'" :class="tab === '{{ $key }}' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'" class="whitespace-nowrap border-b-2 px-1 pb-4 text-sm font-bold">
                                 {{ $group['label'] }}
                             </button>
                         @endforeach
@@ -45,15 +49,15 @@
 
                                     <div>
                                         @if($type === 'checkbox')
-                                            <label class="mt-7 flex items-center gap-3 text-sm font-medium text-gray-800">
-                                                <input type="checkbox" name="{{ $name }}" value="1" @checked((bool) $value) class="rounded border-gray-300 text-emerald-700 shadow-sm focus:ring-emerald-600">
+                                            <label class="mt-7 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800">
+                                                <input type="checkbox" name="{{ $name }}" value="1" @checked((bool) $value) class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-600">
                                                 {{ $field['label'] }}
                                             </label>
                                         @else
-                                            <label for="{{ $name }}" class="block text-sm font-medium text-gray-700">{{ $field['label'] }}</label>
+                                            <label for="{{ $name }}" class="block text-sm font-bold text-slate-700">{{ $field['label'] }}</label>
 
                                             @if($type === 'select')
-                                                <select id="{{ $name }}" name="{{ $name }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-600">
+                                                <select id="{{ $name }}" name="{{ $name }}" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-600">
                                                     @if($field['nullable'] ?? false)
                                                         <option value="">-</option>
                                                     @endif
@@ -62,12 +66,12 @@
                                                     @endforeach
                                                 </select>
                                             @else
-                                                <input id="{{ $name }}" type="{{ $type }}" name="{{ $name }}" value="{{ $value }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-600">
+                                                <input id="{{ $name }}" type="{{ $type }}" name="{{ $name }}" value="{{ $value }}" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-600">
                                             @endif
                                         @endif
 
                                         @error($name)
-                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                            <p class="mt-1 text-sm font-medium text-red-600">{{ $message }}</p>
                                         @enderror
                                     </div>
                                 @endforeach
@@ -76,9 +80,9 @@
                     @endforeach
                 </div>
 
-                <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
-                    <a href="{{ route($route.'.index') }}" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</a>
-                    <button type="submit" class="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800">Save</button>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                    <a href="{{ route($route.'.index') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</a>
+                    <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-emerald-900/10 hover:bg-emerald-700">Save</button>
                 </div>
             </form>
         </div>
