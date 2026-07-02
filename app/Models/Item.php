@@ -13,6 +13,7 @@ class Item extends Model
     protected $casts = [
         'is_stock_item' => 'boolean',
         'is_active' => 'boolean',
+        'use_category_default_accounts' => 'boolean',
     ];
 
     public function category(): BelongsTo

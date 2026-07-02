@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\DocumentNumberService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 abstract class ResourceController extends Controller
@@ -24,6 +26,10 @@ abstract class ResourceController extends Controller
 
     protected array $with = [];
 
+    protected string $formView = 'admin.resources.form';
+
+    protected ?string $documentType = null;
+
     public function index(): View
     {
         $records = $this->query()->latest('id')->paginate(15);
@@ -33,7 +39,7 @@ abstract class ResourceController extends Controller
 
     public function create(): View
     {
-        return view('admin.resources.form', $this->viewData([
+        return view($this->formView, $this->viewData([
             'record' => null,
             'method' => 'POST',
             'action' => route($this->route.'.store'),
@@ -42,7 +48,15 @@ abstract class ResourceController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $record = $this->model::create($this->validated($request));
+        $record = DB::transaction(function () use ($request): Model {
+            $data = $this->validated($request);
+
+            if ($this->documentType && blank($data['number'] ?? null)) {
+                $data['number'] = app(DocumentNumberService::class)->generate($this->documentType);
+            }
+
+            return $this->model::create($data);
+        });
 
         return redirect()->route($this->route.'.show', $record)->with('status', $this->title.' dibuat.');
     }
@@ -58,7 +72,7 @@ abstract class ResourceController extends Controller
     {
         $record = $this->findRecord($record);
 
-        return view('admin.resources.form', $this->viewData([
+        return view($this->formView, $this->viewData([
             'record' => $record,
             'method' => 'PUT',
             'action' => route($this->route.'.update', $record),
@@ -116,7 +130,19 @@ abstract class ResourceController extends Controller
             'title' => $this->title,
             'route' => $this->route,
             'columns' => $this->columns,
-            'fields' => $this->fields,
+            'fields' => $this->visibleFields(),
         ], $data);
+    }
+
+    protected function visibleFields(): array
+    {
+        if (! $this->documentType || request()->routeIs($this->route.'.edit')) {
+            return $this->fields;
+        }
+
+        $fields = $this->fields;
+        unset($fields['number']);
+
+        return $fields;
     }
 }

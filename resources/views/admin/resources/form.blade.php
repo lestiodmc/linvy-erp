@@ -3,19 +3,24 @@
         <h2 class="text-xl font-semibold leading-tight text-gray-900">{{ $record ? 'Edit '.$title : 'New '.$title }}</h2>
     </x-slot>
 
-    <div class="py-8">
-        <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-            <form method="POST" action="{{ $action }}" class="space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+    <div>
+        <div class="mx-auto max-w-4xl">
+            <form method="POST" action="{{ $action }}" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 @csrf
                 @if($method !== 'POST')
                     @method($method)
                 @endif
 
-                <div class="grid gap-5 md:grid-cols-2">
+                <div class="border-b border-slate-100 px-6 py-5">
+                    <h3 class="text-base font-semibold text-slate-900">{{ $record ? 'Edit Details' : 'Create Details' }}</h3>
+                    <p class="mt-1 text-sm text-slate-500">Fill in the required information for this record.</p>
+                </div>
+
+                <div class="grid gap-5 p-6 md:grid-cols-2">
                     @foreach($fields as $name => $field)
                         @php
                             $type = $field['type'] ?? 'text';
-                            $value = old($name, $record ? data_get($record, $name) : ($field['default'] ?? null));
+                            $value = ($field['always_empty'] ?? false) ? old($name) : old($name, $record ? data_get($record, $name) : ($field['default'] ?? null));
                         @endphp
 
                         <div class="{{ $type === 'textarea' ? 'md:col-span-2' : '' }}">
@@ -24,6 +29,18 @@
                                     <input type="checkbox" name="{{ $name }}" value="1" @checked((bool) $value) class="rounded border-gray-300 text-emerald-700 shadow-sm focus:ring-emerald-600">
                                     {{ $field['label'] }}
                                 </label>
+                            @elseif($type === 'multicheckbox')
+                                <fieldset>
+                                    <legend class="block text-sm font-medium text-gray-700">{{ $field['label'] }}</legend>
+                                    <div class="mt-2 grid gap-2 rounded-md border border-gray-200 p-3 sm:grid-cols-2">
+                                        @foreach(($field['options'] ?? []) as $optionValue => $optionLabel)
+                                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                                <input type="checkbox" name="{{ $name }}[]" value="{{ $optionValue }}" @checked(in_array($optionValue, (array) $value, true)) class="rounded border-gray-300 text-emerald-700 shadow-sm focus:ring-emerald-600">
+                                                {{ $optionLabel }}
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </fieldset>
                             @else
                                 <label for="{{ $name }}" class="block text-sm font-medium text-gray-700">{{ $field['label'] }}</label>
 
@@ -50,8 +67,8 @@
                     @endforeach
                 </div>
 
-                <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-5">
-                    <a href="{{ route($route.'.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</a>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                    <a href="{{ route($route.'.index') }}" class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</a>
                     <button type="submit" class="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800">Save</button>
                 </div>
             </form>

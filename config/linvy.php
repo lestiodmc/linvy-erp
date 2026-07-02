@@ -1,0 +1,88 @@
+<?php
+
+return [
+    'optional_modules' => ['inventory', 'purchase', 'sales', 'production', 'accounting'],
+
+    'default_enabled_modules' => [
+        'inventory' => true,
+        'purchase' => true,
+        'sales' => true,
+        'production' => false,
+        'accounting' => false,
+    ],
+
+    'packages' => [
+        'starter' => ['label' => 'Starter', 'modules' => ['inventory', 'purchase', 'sales']],
+        'standard' => ['label' => 'Standard', 'modules' => ['inventory', 'purchase', 'sales', 'production']],
+        'complete' => ['label' => 'Complete', 'modules' => ['inventory', 'purchase', 'sales', 'production', 'accounting']],
+    ],
+
+    'modules' => [
+        'dashboard' => ['label' => 'Dashboard', 'route' => 'dashboard', 'routes' => ['dashboard']],
+        'master-data' => [
+            'label' => 'Master Data',
+            'items' => [
+                ['label' => 'Items', 'route' => 'items.index', 'routes' => ['items.*']],
+                ['label' => 'Item Categories', 'route' => 'item-categories.index', 'routes' => ['item-categories.*']],
+                ['label' => 'Unit of Measure', 'route' => 'units-of-measure.index', 'routes' => ['units-of-measure.*']],
+                ['label' => 'Warehouses', 'route' => 'warehouses.index', 'routes' => ['warehouses.*']],
+                ['label' => 'Suppliers', 'route' => 'suppliers.index', 'routes' => ['suppliers.*']],
+                ['label' => 'Customers', 'route' => 'customers.index', 'routes' => ['customers.*']],
+            ],
+        ],
+        'purchase' => [
+            'label' => 'Purchase',
+            'items' => [
+                ['label' => 'Purchase Orders', 'route' => 'purchase-orders.index', 'routes' => ['purchase-orders.*']],
+                ['label' => 'Receivings', 'route' => 'receivings.index', 'routes' => ['receivings.*']],
+            ],
+        ],
+        'inventory' => [
+            'label' => 'Inventory',
+            'items' => [
+                ['label' => 'Stock Balances', 'route' => 'stock-balances.index', 'routes' => ['stock-balances.*']],
+                ['label' => 'Stock Movements', 'route' => 'stock-movements.index', 'routes' => ['stock-movements.*']],
+                ['label' => 'Warehouse Transfers', 'route' => 'warehouse-transfers.index', 'routes' => ['warehouse-transfers.*']],
+                ['label' => 'Stock Adjustments', 'route' => 'stock-adjustments.index', 'routes' => ['stock-adjustments.*']],
+            ],
+        ],
+        'production' => [
+            'label' => 'Production',
+            'items' => [
+                ['label' => 'Repacking / Production Orders', 'route' => 'productions.index', 'routes' => ['productions.*']],
+            ],
+        ],
+        'sales' => [
+            'label' => 'Sales',
+            'items' => [
+                ['label' => 'Sales Orders', 'route' => 'sales-orders.index', 'routes' => ['sales-orders.*']],
+                ['label' => 'Delivery Orders', 'route' => 'delivery-orders.index', 'routes' => ['delivery-orders.*']],
+            ],
+        ],
+        'accounting' => [
+            'label' => 'Accounting',
+            'items' => [
+                ['label' => 'Accounting Accounts', 'route' => 'accounting-accounts.index', 'routes' => ['accounting-accounts.*']],
+                ['label' => 'Account Mapping', 'route' => 'account-mapping.index', 'routes' => ['account-mapping.*']],
+            ],
+        ],
+        'settings' => [
+            'label' => 'Settings',
+            'items' => [
+                ['label' => 'Users', 'route' => 'users.index', 'routes' => ['users.*']],
+                ['label' => 'Roles', 'route' => 'roles.index', 'routes' => ['roles.*']],
+                ['label' => 'Module Settings', 'route' => 'module-settings.index', 'routes' => ['module-settings.*']],
+                ['label' => 'Document Sequences', 'route' => 'document-sequences.index', 'routes' => ['document-sequences.*']],
+            ],
+        ],
+    ],
+
+    'role_permissions' => [
+        'super-admin' => ['*'],
+        'inventory-admin' => ['dashboard', 'master-data', 'inventory', 'production'],
+        'purchasing' => ['dashboard', 'master-data', 'purchase', 'inventory'],
+        'sales' => ['dashboard', 'master-data', 'sales', 'inventory'],
+        'production' => ['dashboard', 'master-data', 'inventory', 'production'],
+        'accounting' => ['dashboard', 'master-data', 'inventory', 'purchase', 'sales', 'accounting'],
+    ],
+];

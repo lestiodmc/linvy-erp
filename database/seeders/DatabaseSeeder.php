@@ -3,7 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\AccountingAccount;
+use App\Models\DocumentSequence;
 use App\Models\ItemCategory;
+use App\Models\ModuleSetting;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
@@ -20,10 +23,53 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::firstOrCreate(
+        foreach ([
+            ['code' => 'super-admin', 'name' => 'Super Admin'],
+            ['code' => 'inventory-admin', 'name' => 'Inventory Admin'],
+            ['code' => 'purchasing', 'name' => 'Purchasing'],
+            ['code' => 'sales', 'name' => 'Sales'],
+            ['code' => 'production', 'name' => 'Production'],
+            ['code' => 'accounting', 'name' => 'Accounting'],
+        ] as $role) {
+            Role::updateOrCreate(['code' => $role['code']], $role + [
+                'permissions' => config('linvy.role_permissions.'.$role['code'], []),
+                'is_active' => true,
+            ]);
+        }
+
+        $superAdmin = Role::where('code', 'super-admin')->first();
+
+        User::updateOrCreate(
             ['email' => 'admin@linvy.local'],
-            ['name' => 'Linvy Admin', 'password' => Hash::make('password')]
+            ['name' => 'Linvy Admin', 'password' => Hash::make('password'), 'role_id' => $superAdmin?->id]
         );
+
+        foreach (config('linvy.optional_modules') as $module) {
+            ModuleSetting::updateOrCreate(
+                ['module' => $module],
+                [
+                    'label' => str($module)->replace('_', ' ')->title(),
+                    'enabled' => (bool) config("linvy.default_enabled_modules.$module", false),
+                ]
+            );
+        }
+
+        foreach ([
+            ['document_type' => 'purchase_order', 'name' => 'Purchase Order', 'prefix' => 'PO'],
+            ['document_type' => 'receiving', 'name' => 'Receiving', 'prefix' => 'RCV'],
+            ['document_type' => 'sales_order', 'name' => 'Sales Order', 'prefix' => 'SO'],
+            ['document_type' => 'delivery_order', 'name' => 'Delivery Order', 'prefix' => 'DO'],
+            ['document_type' => 'warehouse_transfer', 'name' => 'Warehouse Transfer', 'prefix' => 'TRF'],
+            ['document_type' => 'stock_adjustment', 'name' => 'Stock Adjustment', 'prefix' => 'ADJ'],
+            ['document_type' => 'production', 'name' => 'Production / Repacking', 'prefix' => 'PRD'],
+        ] as $sequence) {
+            DocumentSequence::updateOrCreate(['document_type' => $sequence['document_type']], $sequence + [
+                'period_type' => 'monthly',
+                'padding' => 4,
+                'separator' => '/',
+                'is_active' => true,
+            ]);
+        }
 
         $accounts = [
             ['code' => '1100', 'name' => 'Inventory', 'type' => 'asset'],

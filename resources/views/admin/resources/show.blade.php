@@ -11,13 +11,17 @@
         </div>
     </x-slot>
 
-    <div class="py-8">
-        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+    <div>
+        <div class="mx-auto max-w-5xl">
             @if (session('status'))
                 <div class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('status') }}</div>
             @endif
 
-            <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-100 px-6 py-5">
+                    <h3 class="text-base font-semibold text-slate-900">Record Information</h3>
+                </div>
+                <div class="p-6">
                 <dl class="grid gap-x-6 gap-y-5 md:grid-cols-2">
                     @foreach($record->getAttributes() as $key => $value)
                         <div>
@@ -26,6 +30,7 @@
                         </div>
                     @endforeach
                 </dl>
+                </div>
             </div>
         </div>
     </div>

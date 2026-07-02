@@ -10,9 +10,10 @@ class WarehouseTransferController extends ResourceController
     protected string $model = WarehouseTransfer::class;
     protected string $route = 'warehouse-transfers';
     protected string $title = 'Warehouse Transfer';
+    protected ?string $documentType = 'warehouse_transfer';
     protected array $with = ['fromWarehouse', 'toWarehouse'];
     protected array $columns = ['number', 'fromWarehouse.name', 'toWarehouse.name', 'transfer_date', 'status'];
-    protected array $rules = ['number' => ['required', 'string', 'max:255'], 'from_warehouse_id' => ['required', 'integer'], 'to_warehouse_id' => ['required', 'integer'], 'transfer_date' => ['required', 'date'], 'status' => ['required', 'string'], 'notes' => ['nullable', 'string']];
+    protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'from_warehouse_id' => ['required', 'integer'], 'to_warehouse_id' => ['required', 'integer'], 'transfer_date' => ['required', 'date'], 'status' => ['required', 'string'], 'notes' => ['nullable', 'string']];
 
     public function __construct()
     {

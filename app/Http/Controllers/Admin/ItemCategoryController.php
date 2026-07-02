@@ -10,6 +10,7 @@ class ItemCategoryController extends ResourceController
     protected string $model = ItemCategory::class;
     protected string $route = 'item-categories';
     protected string $title = 'Item Category';
+    protected string $formView = 'admin.item-categories.form';
     protected array $columns = ['code', 'name', 'is_active'];
     protected array $rules = ['code' => ['required', 'string', 'max:255'], 'name' => ['required', 'string', 'max:255'], 'default_inventory_account_id' => ['nullable', 'integer'], 'default_cogs_account_id' => ['nullable', 'integer'], 'default_sales_account_id' => ['nullable', 'integer'], 'default_purchase_account_id' => ['nullable', 'integer'], 'default_wip_account_id' => ['nullable', 'integer'], 'default_adjustment_account_id' => ['nullable', 'integer'], 'default_waste_account_id' => ['nullable', 'integer'], 'is_active' => ['nullable']];
 

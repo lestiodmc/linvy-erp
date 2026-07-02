@@ -10,9 +10,10 @@ class PurchaseOrderController extends ResourceController
     protected string $model = PurchaseOrder::class;
     protected string $route = 'purchase-orders';
     protected string $title = 'Purchase Order';
+    protected ?string $documentType = 'purchase_order';
     protected array $with = ['supplier'];
     protected array $columns = ['number', 'supplier.name', 'order_date', 'expected_date', 'status', 'grand_total'];
-    protected array $rules = ['number' => ['required', 'string', 'max:255'], 'supplier_id' => ['required', 'integer'], 'order_date' => ['required', 'date'], 'expected_date' => ['nullable', 'date'], 'status' => ['required', 'string'], 'subtotal' => ['required', 'numeric'], 'tax_total' => ['required', 'numeric'], 'grand_total' => ['required', 'numeric'], 'notes' => ['nullable', 'string']];
+    protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'supplier_id' => ['required', 'integer'], 'order_date' => ['required', 'date'], 'expected_date' => ['nullable', 'date'], 'status' => ['required', 'string'], 'subtotal' => ['required', 'numeric'], 'tax_total' => ['required', 'numeric'], 'grand_total' => ['required', 'numeric'], 'notes' => ['nullable', 'string']];
 
     public function __construct()
     {

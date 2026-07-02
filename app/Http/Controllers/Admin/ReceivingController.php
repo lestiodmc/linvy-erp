@@ -12,9 +12,10 @@ class ReceivingController extends ResourceController
     protected string $model = Receiving::class;
     protected string $route = 'receivings';
     protected string $title = 'Receiving';
+    protected ?string $documentType = 'receiving';
     protected array $with = ['supplier', 'warehouse'];
     protected array $columns = ['number', 'supplier.name', 'warehouse.name', 'received_date', 'status', 'supplier_delivery_number'];
-    protected array $rules = ['number' => ['required', 'string', 'max:255'], 'purchase_order_id' => ['nullable', 'integer'], 'supplier_id' => ['required', 'integer'], 'warehouse_id' => ['required', 'integer'], 'received_date' => ['required', 'date'], 'status' => ['required', 'string'], 'supplier_delivery_number' => ['nullable', 'string'], 'notes' => ['nullable', 'string']];
+    protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'purchase_order_id' => ['nullable', 'integer'], 'supplier_id' => ['required', 'integer'], 'warehouse_id' => ['required', 'integer'], 'received_date' => ['required', 'date'], 'status' => ['required', 'string'], 'supplier_delivery_number' => ['nullable', 'string'], 'notes' => ['nullable', 'string']];
 
     public function __construct()
     {
