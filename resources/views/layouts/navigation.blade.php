@@ -10,16 +10,57 @@
                     </a>
                 </div>
 
-                <!-- Navigation Links -->
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                <div class="hidden space-x-6 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('items.index')" :active="request()->routeIs('items.*')">
+                        {{ __('Items') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('stock-balances.index')" :active="request()->routeIs('stock-balances.*')">
+                        {{ __('Stock') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('purchase-orders.index')" :active="request()->routeIs('purchase-orders.*')">
+                        {{ __('Purchase') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('productions.index')" :active="request()->routeIs('productions.*')">
+                        {{ __('Production') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('sales-orders.index')" :active="request()->routeIs('sales-orders.*')">
+                        {{ __('Sales') }}
                     </x-nav-link>
                 </div>
             </div>
 
             <!-- Settings Dropdown -->
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+            <div class="hidden gap-3 sm:flex sm:items-center sm:ms-6">
+                <x-dropdown align="right" width="64">
+                    <x-slot name="trigger">
+                        <button class="inline-flex items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-600 transition hover:text-gray-800 focus:outline-none">
+                            <div>Modules</div>
+                            <div class="ms-1">
+                                <svg class="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                        </button>
+                    </x-slot>
+
+                    <x-slot name="content">
+                        <x-dropdown-link :href="route('accounting-accounts.index')">Accounting Accounts</x-dropdown-link>
+                        <x-dropdown-link :href="route('units-of-measure.index')">Unit of Measure</x-dropdown-link>
+                        <x-dropdown-link :href="route('item-categories.index')">Item Categories</x-dropdown-link>
+                        <x-dropdown-link :href="route('suppliers.index')">Suppliers</x-dropdown-link>
+                        <x-dropdown-link :href="route('customers.index')">Customers</x-dropdown-link>
+                        <x-dropdown-link :href="route('warehouses.index')">Warehouses</x-dropdown-link>
+                        <x-dropdown-link :href="route('stock-movements.index')">Stock Movements</x-dropdown-link>
+                        <x-dropdown-link :href="route('receivings.index')">Receivings</x-dropdown-link>
+                        <x-dropdown-link :href="route('warehouse-transfers.index')">Warehouse Transfers</x-dropdown-link>
+                        <x-dropdown-link :href="route('stock-adjustments.index')">Stock Adjustments</x-dropdown-link>
+                        <x-dropdown-link :href="route('delivery-orders.index')">Delivery Orders</x-dropdown-link>
+                    </x-slot>
+                </x-dropdown>
+
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
@@ -70,6 +111,17 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('items.index')" :active="request()->routeIs('items.*')">Items</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('warehouses.index')" :active="request()->routeIs('warehouses.*')">Warehouses</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('stock-balances.index')" :active="request()->routeIs('stock-balances.*')">Stock Balances</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('stock-movements.index')" :active="request()->routeIs('stock-movements.*')">Stock Movements</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('purchase-orders.index')" :active="request()->routeIs('purchase-orders.*')">Purchase Orders</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('receivings.index')" :active="request()->routeIs('receivings.*')">Receivings</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('warehouse-transfers.index')" :active="request()->routeIs('warehouse-transfers.*')">Warehouse Transfers</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('stock-adjustments.index')" :active="request()->routeIs('stock-adjustments.*')">Stock Adjustments</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('productions.index')" :active="request()->routeIs('productions.*')">Production / Repacking</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('sales-orders.index')" :active="request()->routeIs('sales-orders.*')">Sales Orders</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('delivery-orders.index')" :active="request()->routeIs('delivery-orders.*')">Delivery Orders</x-responsive-nav-link>
         </div>
 
         <!-- Responsive Settings Options -->
