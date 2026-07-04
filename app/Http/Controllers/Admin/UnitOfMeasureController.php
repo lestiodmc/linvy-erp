@@ -9,6 +9,7 @@ class UnitOfMeasureController extends ResourceController
     protected string $model = UnitOfMeasure::class;
     protected string $route = 'units-of-measure';
     protected string $title = 'Unit of Measure';
+    protected string $viewPath = 'master.units';
     protected array $columns = ['code', 'name', 'precision', 'is_active'];
     protected array $fields = [
         'code' => ['label' => 'Code', 'type' => 'text'],

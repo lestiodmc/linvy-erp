@@ -10,7 +10,8 @@ class ProductionController extends ResourceController
     protected string $model = Production::class;
     protected string $route = 'productions';
     protected string $title = 'Production / Repacking';
-    protected ?string $documentType = 'production';
+    protected string $viewPath = 'production.repacking_orders';
+    protected ?string $documentType = 'PRD';
     protected array $with = ['productionWarehouse', 'outputWarehouse'];
     protected array $columns = ['number', 'production_date', 'productionWarehouse.name', 'outputWarehouse.name', 'type', 'status'];
     protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'production_date' => ['required', 'date'], 'production_warehouse_id' => ['required', 'integer'], 'output_warehouse_id' => ['required', 'integer'], 'type' => ['required', 'string'], 'status' => ['required', 'string'], 'notes' => ['nullable', 'string']];

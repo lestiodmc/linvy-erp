@@ -9,6 +9,7 @@ class AccountingAccountController extends ResourceController
     protected string $model = AccountingAccount::class;
     protected string $route = 'accounting-accounts';
     protected string $title = 'Accounting Account';
+    protected string $viewPath = 'accounting.accounting_accounts';
     protected array $columns = ['code', 'name', 'type', 'is_active'];
     protected array $fields = [
         'code' => ['label' => 'Code', 'type' => 'text'],

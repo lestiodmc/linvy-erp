@@ -13,7 +13,7 @@ class ModuleSettingController extends Controller
 {
     public function index(): View
     {
-        return view('admin.module-settings.index', [
+        return view('settings.module_settings.index', [
             'package' => request('package'),
             'activePackage' => ModuleManager::packageName(),
             'packages' => config('linvy.packages'),

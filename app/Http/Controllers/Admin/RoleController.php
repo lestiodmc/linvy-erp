@@ -11,6 +11,7 @@ class RoleController extends ResourceController
     protected string $model = Role::class;
     protected string $route = 'roles';
     protected string $title = 'Role';
+    protected string $viewPath = 'settings.roles';
     protected array $columns = ['code', 'name', 'permissions', 'is_active'];
     protected array $rules = ['code' => ['required', 'string', 'max:255'], 'name' => ['required', 'string', 'max:255'], 'permissions' => ['nullable', 'array'], 'is_active' => ['nullable']];
 

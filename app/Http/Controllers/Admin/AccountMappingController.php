@@ -10,7 +10,7 @@ class AccountMappingController extends Controller
 {
     public function __invoke(): View
     {
-        return view('admin.account-mapping.index', [
+        return view('accounting.account_mapping.index', [
             'categories' => ItemCategory::with([
                 'inventoryAccount',
                 'cogsAccount',

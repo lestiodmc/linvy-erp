@@ -26,7 +26,7 @@ abstract class ResourceController extends Controller
 
     protected array $with = [];
 
-    protected string $formView = 'admin.resources.form';
+    protected string $viewPath = '';
 
     protected ?string $documentType = null;
 
@@ -34,12 +34,12 @@ abstract class ResourceController extends Controller
     {
         $records = $this->query()->latest('id')->paginate(15);
 
-        return view('admin.resources.index', $this->viewData(compact('records')));
+        return view($this->viewName('index'), $this->viewData(compact('records')));
     }
 
     public function create(): View
     {
-        return view($this->formView, $this->viewData([
+        return view($this->viewName('create'), $this->viewData([
             'record' => null,
             'method' => 'POST',
             'action' => route($this->route.'.store'),
@@ -65,14 +65,14 @@ abstract class ResourceController extends Controller
     {
         $record = $this->findRecord($record);
 
-        return view('admin.resources.show', $this->viewData(compact('record')));
+        return view($this->viewName('show'), $this->viewData(compact('record')));
     }
 
     public function edit(int|string $record): View
     {
         $record = $this->findRecord($record);
 
-        return view($this->formView, $this->viewData([
+        return view($this->viewName('edit'), $this->viewData([
             'record' => $record,
             'method' => 'PUT',
             'action' => route($this->route.'.update', $record),
@@ -131,7 +131,13 @@ abstract class ResourceController extends Controller
             'route' => $this->route,
             'columns' => $this->columns,
             'fields' => $this->visibleFields(),
+            'viewPath' => $this->viewPath,
         ], $data);
+    }
+
+    protected function viewName(string $view): string
+    {
+        return $this->viewPath.'.'.$view;
     }
 
     protected function visibleFields(): array

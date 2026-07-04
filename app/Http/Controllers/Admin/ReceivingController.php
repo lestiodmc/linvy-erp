@@ -2,23 +2,300 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Controller;
 use App\Models\PurchaseOrder;
 use App\Models\Receiving;
-use App\Models\Supplier;
+use App\Models\StockBalance;
+use App\Models\StockMovement;
 use App\Models\Warehouse;
+use App\Services\DocumentNumberService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
-class ReceivingController extends ResourceController
+class ReceivingController extends Controller
 {
-    protected string $model = Receiving::class;
-    protected string $route = 'receivings';
-    protected string $title = 'Receiving';
-    protected ?string $documentType = 'receiving';
-    protected array $with = ['supplier', 'warehouse'];
-    protected array $columns = ['number', 'supplier.name', 'warehouse.name', 'received_date', 'status', 'supplier_delivery_number'];
-    protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'purchase_order_id' => ['nullable', 'integer'], 'supplier_id' => ['required', 'integer'], 'warehouse_id' => ['required', 'integer'], 'received_date' => ['required', 'date'], 'status' => ['required', 'string'], 'supplier_delivery_number' => ['nullable', 'string'], 'notes' => ['nullable', 'string']];
-
-    public function __construct()
+    public function index(): View
     {
-        $this->fields = ['number' => ['label' => 'Number', 'type' => 'text'], 'purchase_order_id' => ['label' => 'Purchase Order', 'type' => 'select', 'options' => PurchaseOrder::orderBy('number')->pluck('number', 'id')->toArray(), 'nullable' => true], 'supplier_id' => ['label' => 'Supplier', 'type' => 'select', 'options' => Supplier::orderBy('name')->pluck('name', 'id')->toArray()], 'warehouse_id' => ['label' => 'Warehouse', 'type' => 'select', 'options' => Warehouse::orderBy('name')->pluck('name', 'id')->toArray()], 'received_date' => ['label' => 'Received Date', 'type' => 'date'], 'status' => ['label' => 'Status', 'type' => 'select', 'options' => ['draft' => 'Draft', 'posted' => 'Posted', 'cancelled' => 'Cancelled']], 'supplier_delivery_number' => ['label' => 'Supplier Delivery Number', 'type' => 'text'], 'notes' => ['label' => 'Notes', 'type' => 'textarea']];
+        return view('purchase.receivings.index', [
+            'records' => Receiving::with(['purchaseOrder', 'supplier', 'warehouse'])->latest('id')->paginate(15),
+        ]);
+    }
+
+    public function create(): View
+    {
+        $po = PurchaseOrder::with(['supplier', 'lines.item', 'lines.unit'])
+            ->whereIn('status', ['approved', 'partially_received'])
+            ->latest('id')
+            ->first();
+
+        return $po ? $this->buildFromPo($po) : $this->formView(new Receiving([
+            'received_date' => now()->toDateString(),
+            'status' => 'draft',
+        ]));
+    }
+
+    public function createFromPo(PurchaseOrder $purchaseOrder): View
+    {
+        return $this->buildFromPo($purchaseOrder);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $record = DB::transaction(function () use ($request): Receiving {
+            $data = $this->validated($request);
+            $lines = $data['lines'];
+            unset($data['lines']);
+
+            $purchaseOrder = PurchaseOrder::with('lines')->lockForUpdate()->findOrFail($data['purchase_order_id']);
+            $this->ensureReceivable($purchaseOrder);
+
+            $record = Receiving::create($data + [
+                'number' => app(DocumentNumberService::class)->generate('RCV'),
+                'supplier_id' => $purchaseOrder->supplier_id,
+                'status' => 'draft',
+            ]);
+
+            $this->syncLines($record, $purchaseOrder, $lines);
+
+            return $record;
+        });
+
+        return redirect()->route('receivings.show', $record)->with('status', 'Receiving dibuat.');
+    }
+
+    public function show(Receiving $record): View
+    {
+        return view('purchase.receivings.show', [
+            'record' => $record->load(['purchaseOrder', 'supplier', 'warehouse', 'lines.item', 'lines.unit', 'lines.purchaseOrderLine']),
+        ]);
+    }
+
+    public function edit(Receiving $record): View
+    {
+        abort_if($record->status !== 'draft', 422, 'Posted receiving cannot be edited.');
+
+        return $this->formView($record->load(['purchaseOrder.lines', 'lines']));
+    }
+
+    public function update(Request $request, Receiving $record): RedirectResponse
+    {
+        abort_if($record->status !== 'draft', 422, 'Posted receiving cannot be edited.');
+
+        DB::transaction(function () use ($request, $record): void {
+            $data = $this->validated($request);
+            $lines = $data['lines'];
+            unset($data['lines']);
+
+            $purchaseOrder = PurchaseOrder::with('lines')->lockForUpdate()->findOrFail($data['purchase_order_id']);
+            $this->ensureReceivable($purchaseOrder);
+
+            $record->update($data + ['supplier_id' => $purchaseOrder->supplier_id]);
+            $this->syncLines($record, $purchaseOrder, $lines);
+        });
+
+        return redirect()->route('receivings.show', $record)->with('status', 'Receiving diperbarui.');
+    }
+
+    public function destroy(Receiving $record): RedirectResponse
+    {
+        abort_if($record->status !== 'draft', 422, 'Only draft receiving can be deleted.');
+        $record->delete();
+
+        return redirect()->route('receivings.index')->with('status', 'Receiving dihapus.');
+    }
+
+    public function post(Receiving $record): RedirectResponse
+    {
+        abort_if($record->status !== 'draft', 422, 'Only draft receiving can be posted.');
+
+        DB::transaction(function () use ($record): void {
+            $record->load(['purchaseOrder.lines', 'lines']);
+            $purchaseOrder = PurchaseOrder::whereKey($record->purchase_order_id)->lockForUpdate()->firstOrFail();
+            $this->ensureReceivable($purchaseOrder);
+
+            foreach ($record->lines as $line) {
+                $poLine = $purchaseOrder->lines()->whereKey($line->purchase_order_line_id)->lockForUpdate()->firstOrFail();
+                $remaining = (float) $poLine->quantity - (float) $poLine->received_quantity;
+
+                if ((float) $line->received_quantity <= 0 || (float) $line->received_quantity > $remaining) {
+                    throw ValidationException::withMessages([
+                        'lines' => 'Receiving quantity cannot exceed remaining PO quantity.',
+                    ]);
+                }
+
+                $newReceivedQuantity = (float) $poLine->received_quantity + (float) $line->received_quantity;
+                $poLine->update([
+                    'received_quantity' => $newReceivedQuantity,
+                    'remaining_quantity' => max(0, (float) $poLine->quantity - $newReceivedQuantity),
+                ]);
+
+                StockMovement::create([
+                    'item_id' => $line->item_id,
+                    'warehouse_id' => $record->warehouse_id,
+                    'movement_type' => 'PURCHASE_RECEIVE',
+                    'quantity_in' => $line->received_quantity,
+                    'quantity_out' => 0,
+                    'unit_cost' => $line->unit_cost,
+                    'total_cost' => (float) $line->received_quantity * (float) $line->unit_cost,
+                    'reference_type' => Receiving::class,
+                    'reference_id' => $record->id,
+                    'reference_number' => $record->number,
+                    'movement_date' => $record->received_date,
+                    'notes' => $line->notes,
+                    'created_by' => Auth::id(),
+                ]);
+
+                $this->updateStockBalance($line->item_id, $record->warehouse_id, (float) $line->received_quantity, (float) $line->unit_cost, $record->received_date);
+            }
+
+            $record->update(['status' => 'posted']);
+            $this->refreshPurchaseOrderStatus($purchaseOrder->fresh('lines'));
+        });
+
+        return back()->with('status', 'Receiving posted dan stock masuk tercatat.');
+    }
+
+    public function cancel(Receiving $record): RedirectResponse
+    {
+        abort_if($record->status === 'posted', 422, 'Posted receiving cannot be cancelled.');
+        $record->update(['status' => 'cancelled']);
+
+        return back()->with('status', 'Receiving cancelled.');
+    }
+
+    private function buildFromPo(PurchaseOrder $purchaseOrder): View
+    {
+        $purchaseOrder->load(['supplier', 'lines.item', 'lines.unit']);
+        $this->ensureReceivable($purchaseOrder);
+
+        $record = new Receiving([
+            'purchase_order_id' => $purchaseOrder->id,
+            'supplier_id' => $purchaseOrder->supplier_id,
+            'received_date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        $record->setRelation('lines', $purchaseOrder->lines->where('remaining_quantity', '>', 0)->map(function ($line) {
+            return new \App\Models\ReceivingLine([
+                'purchase_order_line_id' => $line->id,
+                'item_id' => $line->item_id,
+                'description' => $line->description ?: $line->item?->name,
+                'ordered_quantity' => $line->quantity,
+                'previously_received_quantity' => $line->received_quantity,
+                'received_quantity' => $line->remaining_quantity,
+                'remaining_quantity' => 0,
+                'unit_id' => $line->unit_id,
+                'unit_cost' => $line->unit_price,
+            ]);
+        }));
+
+        return $this->formView($record);
+    }
+
+    private function formView(Receiving $record): View
+    {
+        return view('purchase.receivings.'.($record->exists ? 'edit' : 'create'), [
+            'record' => $record,
+            'purchaseOrders' => PurchaseOrder::with('supplier')->whereIn('status', ['approved', 'partially_received'])->orderBy('number')->get(),
+            'warehouses' => Warehouse::where('is_active', true)->orderBy('name')->get(),
+        ]);
+    }
+
+    private function validated(Request $request): array
+    {
+        return $request->validate([
+            'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
+            'warehouse_id' => ['required', 'exists:warehouses,id'],
+            'received_date' => ['required', 'date'],
+            'supplier_delivery_number' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*.purchase_order_line_id' => ['required', 'exists:purchase_order_lines,id'],
+            'lines.*.received_quantity' => ['required', 'numeric', 'gt:0'],
+            'lines.*.unit_cost' => ['required', 'numeric', 'gte:0'],
+            'lines.*.notes' => ['nullable', 'string'],
+        ]);
+    }
+
+    private function syncLines(Receiving $record, PurchaseOrder $purchaseOrder, array $lines): void
+    {
+        $record->lines()->delete();
+
+        foreach ($lines as $line) {
+            $poLine = $purchaseOrder->lines->firstWhere('id', (int) $line['purchase_order_line_id']);
+            abort_if(! $poLine, 422, 'Receiving line must come from selected purchase order.');
+
+            $remaining = (float) $poLine->quantity - (float) $poLine->received_quantity;
+            if ((float) $line['received_quantity'] > $remaining) {
+                throw ValidationException::withMessages([
+                    'lines' => 'Receiving quantity cannot exceed remaining PO quantity.',
+                ]);
+            }
+
+            $record->lines()->create([
+                'purchase_order_line_id' => $poLine->id,
+                'item_id' => $poLine->item_id,
+                'description' => $poLine->description,
+                'ordered_quantity' => $poLine->quantity,
+                'previously_received_quantity' => $poLine->received_quantity,
+                'received_quantity' => $line['received_quantity'],
+                'remaining_quantity' => $remaining - (float) $line['received_quantity'],
+                'unit_id' => $poLine->unit_id,
+                'unit_cost' => $line['unit_cost'],
+                'notes' => $line['notes'] ?? null,
+            ]);
+        }
+    }
+
+    private function ensureReceivable(PurchaseOrder $purchaseOrder): void
+    {
+        abort_if(! in_array($purchaseOrder->status, ['approved', 'partially_received'], true), 422, 'PO can only be received when approved or partially received.');
+    }
+
+    private function updateStockBalance(int $itemId, int $warehouseId, float $quantity, float $unitCost, mixed $movementDate): void
+    {
+        $balance = StockBalance::where('item_id', $itemId)
+            ->where('warehouse_id', $warehouseId)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $balance) {
+            StockBalance::create([
+                'item_id' => $itemId,
+                'warehouse_id' => $warehouseId,
+                'quantity_on_hand' => $quantity,
+                'quantity_reserved' => 0,
+                'average_cost' => $unitCost,
+                'last_movement_at' => $movementDate,
+            ]);
+
+            return;
+        }
+
+        $oldQuantity = (float) $balance->quantity_on_hand;
+        $newQuantity = $oldQuantity + $quantity;
+        $averageCost = $newQuantity > 0
+            ? (($oldQuantity * (float) $balance->average_cost) + ($quantity * $unitCost)) / $newQuantity
+            : $unitCost;
+
+        $balance->update([
+            'quantity_on_hand' => $newQuantity,
+            'average_cost' => $averageCost,
+            'last_movement_at' => $movementDate,
+        ]);
+    }
+
+    private function refreshPurchaseOrderStatus(PurchaseOrder $purchaseOrder): void
+    {
+        $allReceived = $purchaseOrder->lines->every(fn ($line) => (float) $line->received_quantity >= (float) $line->quantity);
+        $anyReceived = $purchaseOrder->lines->contains(fn ($line) => (float) $line->received_quantity > 0);
+
+        $purchaseOrder->update([
+            'status' => $allReceived ? 'fully_received' : ($anyReceived ? 'partially_received' : 'approved'),
+        ]);
     }
 }

@@ -2,14 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\AccountingAccount;
 use App\Models\DocumentSequence;
-use App\Models\ItemCategory;
 use App\Models\ModuleSetting;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\UnitOfMeasure;
-use App\Models\Warehouse;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -18,10 +14,27 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
+    {
+        $this->seedAccessData();
+        $this->seedDocumentSequences();
+
+        $this->call([
+            AccountingAccountSeeder::class,
+            WarehouseSeeder::class,
+            UnitSeeder::class,
+            ItemCategorySeeder::class,
+            SupplierSeeder::class,
+            CustomerSeeder::class,
+            ItemSeeder::class,
+            PurchaseRequestSeeder::class,
+            PurchaseOrderSeeder::class,
+            ReceivingSeeder::class,
+            StockMovementSeeder::class,
+        ]);
+    }
+
+    private function seedAccessData(): void
     {
         foreach ([
             ['code' => 'super-admin', 'name' => 'Super Admin'],
@@ -53,15 +66,19 @@ class DatabaseSeeder extends Seeder
                 ]
             );
         }
+    }
 
+    private function seedDocumentSequences(): void
+    {
         foreach ([
-            ['document_type' => 'purchase_order', 'name' => 'Purchase Order', 'prefix' => 'PO'],
-            ['document_type' => 'receiving', 'name' => 'Receiving', 'prefix' => 'RCV'],
-            ['document_type' => 'sales_order', 'name' => 'Sales Order', 'prefix' => 'SO'],
-            ['document_type' => 'delivery_order', 'name' => 'Delivery Order', 'prefix' => 'DO'],
-            ['document_type' => 'warehouse_transfer', 'name' => 'Warehouse Transfer', 'prefix' => 'TRF'],
-            ['document_type' => 'stock_adjustment', 'name' => 'Stock Adjustment', 'prefix' => 'ADJ'],
-            ['document_type' => 'production', 'name' => 'Production / Repacking', 'prefix' => 'PRD'],
+            ['document_type' => 'PR', 'name' => 'Purchase Request', 'prefix' => 'PR'],
+            ['document_type' => 'PO', 'name' => 'Purchase Order', 'prefix' => 'PO'],
+            ['document_type' => 'RCV', 'name' => 'Receiving', 'prefix' => 'RCV'],
+            ['document_type' => 'SO', 'name' => 'Sales Order', 'prefix' => 'SO'],
+            ['document_type' => 'DO', 'name' => 'Delivery Order', 'prefix' => 'DO'],
+            ['document_type' => 'TRF', 'name' => 'Warehouse Transfer', 'prefix' => 'TRF'],
+            ['document_type' => 'ADJ', 'name' => 'Stock Adjustment', 'prefix' => 'ADJ'],
+            ['document_type' => 'PRD', 'name' => 'Production / Repacking', 'prefix' => 'PRD'],
         ] as $sequence) {
             DocumentSequence::updateOrCreate(['document_type' => $sequence['document_type']], $sequence + [
                 'period_type' => 'monthly',
@@ -69,58 +86,6 @@ class DatabaseSeeder extends Seeder
                 'separator' => '/',
                 'is_active' => true,
             ]);
-        }
-
-        $accounts = [
-            ['code' => '1100', 'name' => 'Inventory', 'type' => 'asset'],
-            ['code' => '1110', 'name' => 'Work In Process', 'type' => 'asset'],
-            ['code' => '5000', 'name' => 'Cost of Goods Sold', 'type' => 'expense'],
-            ['code' => '4000', 'name' => 'Sales Revenue', 'type' => 'revenue'],
-            ['code' => '5100', 'name' => 'Purchase Expense', 'type' => 'expense'],
-            ['code' => '5200', 'name' => 'Inventory Adjustment', 'type' => 'expense'],
-            ['code' => '5300', 'name' => 'Waste and Reject', 'type' => 'expense'],
-        ];
-
-        foreach ($accounts as $account) {
-            AccountingAccount::firstOrCreate(['code' => $account['code']], $account);
-        }
-
-        $accountIds = AccountingAccount::pluck('id', 'code');
-
-        foreach ([
-            ['code' => 'RM', 'name' => 'Raw Material'],
-            ['code' => 'PM', 'name' => 'Packaging Material'],
-            ['code' => 'FG', 'name' => 'Finished Goods'],
-            ['code' => 'CONS', 'name' => 'Consumable'],
-            ['code' => 'NSTK', 'name' => 'Non Stock'],
-        ] as $category) {
-            ItemCategory::firstOrCreate(['code' => $category['code']], $category + [
-                'default_inventory_account_id' => $accountIds['1100'],
-                'default_cogs_account_id' => $accountIds['5000'],
-                'default_sales_account_id' => $accountIds['4000'],
-                'default_purchase_account_id' => $accountIds['5100'],
-                'default_wip_account_id' => $accountIds['1110'],
-                'default_adjustment_account_id' => $accountIds['5200'],
-                'default_waste_account_id' => $accountIds['5300'],
-            ]);
-        }
-
-        foreach ([
-            ['code' => 'KG', 'name' => 'Kilogram', 'precision' => 3],
-            ['code' => 'PCS', 'name' => 'Pieces', 'precision' => 0],
-            ['code' => 'BOX', 'name' => 'Box', 'precision' => 0],
-        ] as $uom) {
-            UnitOfMeasure::firstOrCreate(['code' => $uom['code']], $uom);
-        }
-
-        foreach ([
-            ['code' => 'RM-WH', 'name' => 'Raw Material Warehouse', 'type' => 'raw_material'],
-            ['code' => 'PROD-WH', 'name' => 'Production Warehouse', 'type' => 'production'],
-            ['code' => 'FG-WH', 'name' => 'Finished Goods Warehouse', 'type' => 'finished_goods'],
-            ['code' => 'REJECT-WH', 'name' => 'Reject Warehouse', 'type' => 'reject'],
-            ['code' => 'TRANSIT-WH', 'name' => 'Transit Warehouse', 'type' => 'transit'],
-        ] as $warehouse) {
-            Warehouse::firstOrCreate(['code' => $warehouse['code']], $warehouse);
         }
     }
 }

@@ -9,6 +9,7 @@ class DocumentSequenceController extends ResourceController
     protected string $model = DocumentSequence::class;
     protected string $route = 'document-sequences';
     protected string $title = 'Document Sequence';
+    protected string $viewPath = 'settings.document_sequences';
     protected array $columns = ['document_type', 'name', 'prefix', 'period_type', 'current_period', 'last_number', 'padding', 'is_active'];
     protected array $fields = [
         'document_type' => ['label' => 'Document Type', 'type' => 'text'],

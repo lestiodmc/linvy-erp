@@ -15,7 +15,7 @@ class ItemController extends ResourceController
     protected string $model = Item::class;
     protected string $route = 'items';
     protected string $title = 'Item';
-    protected string $formView = 'admin.items.form';
+    protected string $viewPath = 'master.items';
     protected array $columns = ['sku', 'name', 'type', 'is_stock_item', 'is_active'];
     protected array $rules = ['sku' => ['required', 'string', 'max:255'], 'name' => ['required', 'string', 'max:255'], 'type' => ['required', 'string'], 'item_category_id' => ['required', 'integer'], 'unit_of_measure_id' => ['required', 'integer'], 'is_stock_item' => ['nullable'], 'standard_cost' => ['required', 'numeric'], 'cost_method' => ['required', 'string'], 'use_category_default_accounts' => ['nullable'], 'inventory_account_id' => ['nullable', 'integer'], 'cogs_account_id' => ['nullable', 'integer'], 'sales_account_id' => ['nullable', 'integer'], 'purchase_account_id' => ['nullable', 'integer'], 'wip_account_id' => ['nullable', 'integer'], 'adjustment_account_id' => ['nullable', 'integer'], 'waste_account_id' => ['nullable', 'integer'], 'is_active' => ['nullable'], 'notes' => ['nullable', 'string']];
 

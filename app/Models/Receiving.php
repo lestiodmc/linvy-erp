@@ -10,6 +10,15 @@ class Receiving extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'received_date' => 'date',
+    ];
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class);
+    }
+
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);

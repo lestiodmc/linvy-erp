@@ -10,7 +10,8 @@ class SalesOrderController extends ResourceController
     protected string $model = SalesOrder::class;
     protected string $route = 'sales-orders';
     protected string $title = 'Sales Order';
-    protected ?string $documentType = 'sales_order';
+    protected string $viewPath = 'sales.sales_orders';
+    protected ?string $documentType = 'SO';
     protected array $with = ['customer'];
     protected array $columns = ['number', 'customer.name', 'order_date', 'requested_delivery_date', 'status', 'grand_total'];
     protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'customer_id' => ['required', 'integer'], 'order_date' => ['required', 'date'], 'requested_delivery_date' => ['nullable', 'date'], 'status' => ['required', 'string'], 'subtotal' => ['required', 'numeric'], 'tax_total' => ['required', 'numeric'], 'grand_total' => ['required', 'numeric'], 'notes' => ['nullable', 'string']];

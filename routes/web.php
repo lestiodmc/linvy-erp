@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\DocumentSequenceController;
 use App\Http\Controllers\Admin\ItemCategoryController;
 use App\Http\Controllers\Admin\ItemController;
 use App\Http\Controllers\Admin\ModuleSettingController;
+use App\Http\Controllers\Admin\PurchaseRequestController;
 use App\Http\Controllers\Admin\ProductionController;
 use App\Http\Controllers\Admin\PurchaseOrderController;
 use App\Http\Controllers\Admin\ReceivingController;
@@ -46,7 +47,23 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('module:purchase')->group(function () {
+        Route::post('purchase-requests/{record}/submit', [PurchaseRequestController::class, 'submit'])->name('purchase-requests.submit');
+        Route::post('purchase-requests/{record}/approve', [PurchaseRequestController::class, 'approve'])->name('purchase-requests.approve');
+        Route::post('purchase-requests/{record}/reject', [PurchaseRequestController::class, 'reject'])->name('purchase-requests.reject');
+        Route::post('purchase-requests/{record}/close', [PurchaseRequestController::class, 'close'])->name('purchase-requests.close');
+        Route::post('purchase-requests/{record}/cancel', [PurchaseRequestController::class, 'cancel'])->name('purchase-requests.cancel');
+        Route::resource('purchase-requests', PurchaseRequestController::class)->parameters(['purchase-requests' => 'record']);
+
+        Route::get('purchase-orders/create-from-pr/{purchaseRequest}', [PurchaseOrderController::class, 'createFromPr'])->name('purchase-orders.create-from-pr');
+        Route::post('purchase-orders/{record}/submit', [PurchaseOrderController::class, 'submit'])->name('purchase-orders.submit');
+        Route::post('purchase-orders/{record}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-orders.approve');
+        Route::post('purchase-orders/{record}/reject', [PurchaseOrderController::class, 'reject'])->name('purchase-orders.reject');
+        Route::post('purchase-orders/{record}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
         Route::resource('purchase-orders', PurchaseOrderController::class)->parameters(['purchase-orders' => 'record']);
+
+        Route::get('receivings/create-from-po/{purchaseOrder}', [ReceivingController::class, 'createFromPo'])->name('receivings.create-from-po');
+        Route::post('receivings/{record}/post', [ReceivingController::class, 'post'])->name('receivings.post');
+        Route::post('receivings/{record}/cancel', [ReceivingController::class, 'cancel'])->name('receivings.cancel');
         Route::resource('receivings', ReceivingController::class)->parameters(['receivings' => 'record']);
     });
 

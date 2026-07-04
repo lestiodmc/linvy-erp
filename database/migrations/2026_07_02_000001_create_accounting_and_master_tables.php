@@ -91,7 +91,7 @@ return new class extends Migration
             $table->id();
             $table->string('code')->unique();
             $table->string('name');
-            $table->enum('type', ['raw_material', 'production', 'finished_goods', 'reject', 'transit']);
+            $table->enum('type', ['raw_material', 'packaging', 'production', 'finished_goods', 'reject', 'transit']);
             $table->text('address')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();

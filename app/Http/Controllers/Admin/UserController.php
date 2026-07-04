@@ -13,6 +13,7 @@ class UserController extends ResourceController
     protected string $model = User::class;
     protected string $route = 'users';
     protected string $title = 'User';
+    protected string $viewPath = 'settings.users';
     protected array $with = ['role'];
     protected array $columns = ['name', 'email', 'role.name', 'created_at'];
     protected array $rules = ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255'], 'role_id' => ['nullable', 'integer'], 'password' => ['nullable', 'string', 'min:8']];

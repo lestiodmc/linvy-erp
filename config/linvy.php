@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'company' => [
+        'name' => 'PT Linvy Seafood Indonesia',
+    ],
+
     'optional_modules' => ['inventory', 'purchase', 'sales', 'production', 'accounting'],
 
     'default_enabled_modules' => [
@@ -33,6 +37,7 @@ return [
         'purchase' => [
             'label' => 'Purchase',
             'items' => [
+                ['label' => 'Purchase Requests', 'route' => 'purchase-requests.index', 'routes' => ['purchase-requests.*']],
                 ['label' => 'Purchase Orders', 'route' => 'purchase-orders.index', 'routes' => ['purchase-orders.*']],
                 ['label' => 'Receivings', 'route' => 'receivings.index', 'routes' => ['receivings.*']],
             ],
