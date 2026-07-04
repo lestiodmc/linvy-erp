@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\UnitOfMeasure;
+use App\Models\WarehouseType;
 use Illuminate\Database\Seeder;
 
 class ItemSeeder extends Seeder
@@ -13,6 +14,7 @@ class ItemSeeder extends Seeder
     {
         $categories = ItemCategory::pluck('id', 'code');
         $units = UnitOfMeasure::pluck('id', 'code');
+        $warehouseTypes = WarehouseType::pluck('id', 'code');
 
         $items = [
             ['RM001', 'Kepiting Raw Jumbo', 'raw_material', 'RM', 'KG', 95000],
@@ -53,11 +55,23 @@ class ItemSeeder extends Seeder
                 'type' => $type,
                 'item_category_id' => $categories[$categoryCode],
                 'unit_of_measure_id' => $units[$unitCode],
+                'default_warehouse_type_id' => $warehouseTypes[$this->warehouseTypeCode($type)] ?? null,
                 'is_stock_item' => true,
                 'standard_cost' => $standardCost,
                 'is_active' => true,
                 'notes' => 'PT Linvy Seafood Indonesia demo item',
             ]);
         }
+    }
+
+    private function warehouseTypeCode(string $itemType): string
+    {
+        return match ($itemType) {
+            'raw_material' => 'RAW_MATERIAL',
+            'packaging_material' => 'PACKAGING',
+            'finished_goods' => 'FINISHED_GOODS',
+            'consumable' => 'CONSUMABLE',
+            default => 'RAW_MATERIAL',
+        };
     }
 }

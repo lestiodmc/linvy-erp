@@ -19,7 +19,7 @@ class StockMovementSeeder extends Seeder
             ->get();
 
         $itemWarehousePairs = $receivings
-            ->flatMap(fn ($receiving) => $receiving->lines->map(fn ($line) => [$line->item_id, $receiving->warehouse_id]))
+            ->flatMap(fn ($receiving) => $receiving->lines->map(fn ($line) => [$line->item_id, $line->warehouse_id]))
             ->unique(fn ($pair) => $pair[0].'-'.$pair[1]);
 
         StockMovement::where('movement_type', 'PURCHASE_RECEIVE')
@@ -36,7 +36,7 @@ class StockMovementSeeder extends Seeder
             foreach ($receiving->lines as $line) {
                 StockMovement::create([
                     'item_id' => $line->item_id,
-                    'warehouse_id' => $receiving->warehouse_id,
+                    'warehouse_id' => $line->warehouse_id,
                     'movement_type' => 'PURCHASE_RECEIVE',
                     'quantity_in' => $line->received_quantity,
                     'quantity_out' => 0,
@@ -52,7 +52,7 @@ class StockMovementSeeder extends Seeder
 
                 $this->updateStockBalance(
                     $line->item_id,
-                    $receiving->warehouse_id,
+                    $line->warehouse_id,
                     (float) $line->received_quantity,
                     (float) $line->unit_cost,
                     $receiving->received_date

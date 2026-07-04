@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\AccountingAccountController;
 use App\Http\Controllers\Admin\AccountMappingController;
+use App\Http\Controllers\Admin\BranchController;
+use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeliveryOrderController;
@@ -22,6 +24,7 @@ use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\UnitOfMeasureController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WarehouseController;
+use App\Http\Controllers\Admin\WarehouseTypeController;
 use App\Http\Controllers\Admin\WarehouseTransferController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +41,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::middleware('module:master-data')->group(function () {
+        Route::resource('companies', CompanyController::class)->parameters(['companies' => 'record']);
+        Route::resource('branches', BranchController::class)->parameters(['branches' => 'record']);
+        Route::resource('warehouse-types', WarehouseTypeController::class)->parameters(['warehouse-types' => 'record']);
         Route::resource('units-of-measure', UnitOfMeasureController::class)->parameters(['units-of-measure' => 'record']);
         Route::resource('item-categories', ItemCategoryController::class)->parameters(['item-categories' => 'record']);
         Route::resource('items', ItemController::class)->parameters(['items' => 'record']);

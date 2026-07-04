@@ -26,6 +26,11 @@ class Item extends Model
         return $this->belongsTo(UnitOfMeasure::class);
     }
 
+    public function defaultWarehouseType(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseType::class, 'default_warehouse_type_id');
+    }
+
     public function stockBalances(): HasMany
     {
         return $this->hasMany(StockBalance::class);

@@ -79,6 +79,7 @@ class ReceivingSeeder extends Seeder
 
             foreach ($receiving['lines'] as [$sku, $quantity]) {
                 $poLine = $po->lines->first(fn ($line) => $line->item?->sku === $sku);
+                $lineWarehouseId = $this->warehouseIdForItem($poLine->item) ?? $warehouse->id;
                 $previouslyReceived = (float) $poLine->received_quantity;
                 $remainingBefore = (float) $poLine->quantity - $previouslyReceived;
                 $remainingAfter = $remainingBefore - $quantity;
@@ -91,6 +92,7 @@ class ReceivingSeeder extends Seeder
                     'previously_received_quantity' => $previouslyReceived,
                     'received_quantity' => $quantity,
                     'remaining_quantity' => $remainingAfter,
+                    'warehouse_id' => $lineWarehouseId,
                     'unit_id' => $poLine->unit_id,
                     'unit_cost' => $poLine->unit_price,
                     'notes' => 'Accepted by warehouse checker.',
@@ -119,5 +121,14 @@ class ReceivingSeeder extends Seeder
     private function number(string $prefix, int $idx): string
     {
         return $prefix.'/'.now()->format('Y').'/'.now()->format('m').'/'.str_pad((string) $idx, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function warehouseIdForItem(\App\Models\Item $item): ?int
+    {
+        return Warehouse::where('is_active', true)
+            ->where('warehouse_type_id', $item->default_warehouse_type_id)
+            ->whereHas('branch', fn ($query) => $query->where('code', 'SBY'))
+            ->orderBy('id')
+            ->value('id');
     }
 }

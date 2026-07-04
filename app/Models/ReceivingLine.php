@@ -28,4 +28,9 @@ class ReceivingLine extends Model
     {
         return $this->belongsTo(UnitOfMeasure::class);
     }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
 }

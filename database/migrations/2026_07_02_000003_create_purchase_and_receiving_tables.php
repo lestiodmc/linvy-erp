@@ -68,7 +68,7 @@ return new class extends Migration
             $table->string('number')->unique();
             $table->foreignId('purchase_order_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('supplier_id')->constrained()->restrictOnDelete();
-            $table->foreignId('warehouse_id')->constrained()->restrictOnDelete();
+            $table->foreignId('warehouse_id')->nullable()->constrained()->nullOnDelete();
             $table->date('received_date');
             $table->enum('status', ['draft', 'posted', 'cancelled'])->default('draft');
             $table->string('supplier_delivery_number')->nullable();
@@ -86,6 +86,7 @@ return new class extends Migration
             $table->decimal('previously_received_quantity', 18, 4)->default(0);
             $table->decimal('received_quantity', 18, 4);
             $table->decimal('remaining_quantity', 18, 4)->default(0);
+            $table->foreignId('warehouse_id')->constrained()->restrictOnDelete();
             $table->foreignId('unit_id')->constrained('units_of_measure')->restrictOnDelete();
             $table->decimal('unit_cost', 18, 4)->default(0);
             $table->text('notes')->nullable();

@@ -20,22 +20,13 @@
                 @method($method)
             @endif
 
-            <div class="grid gap-5 border-b border-slate-100 p-6 md:grid-cols-4">
+            <div class="grid gap-5 border-b border-slate-100 p-6 md:grid-cols-3">
                 <div>
                     <label class="text-sm font-bold text-slate-600">Purchase Order</label>
                     <select name="purchase_order_id" class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Select PO</option>
                         @foreach($purchaseOrders as $po)
                             <option value="{{ $po->id }}" @selected((string)old('purchase_order_id', $record->purchase_order_id) === (string)$po->id)>{{ $po->number }} - {{ $po->supplier?->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="text-sm font-bold text-slate-600">Warehouse</label>
-                    <select name="warehouse_id" class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                        <option value="">Select warehouse</option>
-                        @foreach($warehouses as $warehouse)
-                            <option value="{{ $warehouse->id }}" @selected((string)old('warehouse_id', $record->warehouse_id) === (string)$warehouse->id)>{{ $warehouse->name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -47,7 +38,7 @@
                     <label class="text-sm font-bold text-slate-600">Supplier Delivery No.</label>
                     <input name="supplier_delivery_number" value="{{ old('supplier_delivery_number', $record->supplier_delivery_number) }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
                 </div>
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <label class="text-sm font-bold text-slate-600">Notes</label>
                     <input name="notes" value="{{ old('notes', $record->notes) }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
                 </div>
@@ -64,7 +55,7 @@
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
                         <thead class="bg-slate-50">
                             <tr class="text-left text-xs font-black uppercase text-slate-500">
-                                <th class="px-3 py-3">Item</th><th class="px-3 py-3 text-right">Ordered</th><th class="px-3 py-3 text-right">Previous</th><th class="px-3 py-3 text-right">Receive</th><th class="px-3 py-3 text-right">Remaining After</th><th class="px-3 py-3 text-right">Unit Cost</th><th class="px-3 py-3">Notes</th>
+                                <th class="px-3 py-3">Item</th><th class="px-3 py-3">Warehouse</th><th class="px-3 py-3 text-right">Ordered</th><th class="px-3 py-3 text-right">Previous</th><th class="px-3 py-3 text-right">Receive</th><th class="px-3 py-3 text-right">Remaining After</th><th class="px-3 py-3 text-right">Unit Cost</th><th class="px-3 py-3">Notes</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -75,6 +66,16 @@
                                         <div class="font-bold text-slate-900">{{ \App\Models\Item::find($line['item_id'] ?? null)?->name }}</div>
                                         <div class="text-xs text-slate-500">{{ $line['description'] ?? '' }}</div>
                                     </td>
+                                    <td class="px-3 py-3">
+                                        <select name="lines[{{ $i }}][warehouse_id]" class="w-56 rounded-lg border-slate-200 text-sm">
+                                            <option value="">Select warehouse</option>
+                                            @foreach($warehouses as $warehouse)
+                                                <option value="{{ $warehouse->id }}" @selected((string)($line['warehouse_id'] ?? '') === (string)$warehouse->id)>
+                                                    {{ $warehouse->branch?->name ? $warehouse->branch->name.' - ' : '' }}{{ $warehouse->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </td>
                                     <td class="px-3 py-3 text-right">{{ number_format($line['ordered_quantity'] ?? 0, 4) }}</td>
                                     <td class="px-3 py-3 text-right">{{ number_format($line['previously_received_quantity'] ?? 0, 4) }}</td>
                                     <td class="px-3 py-3 text-right"><input type="number" step="0.0001" name="lines[{{ $i }}][received_quantity]" value="{{ $line['received_quantity'] ?? 0 }}" class="w-32 rounded-lg border-slate-200 text-right text-sm"></td>
@@ -83,7 +84,7 @@
                                     <td class="px-3 py-3"><input name="lines[{{ $i }}][notes]" value="{{ $line['notes'] ?? '' }}" class="w-52 rounded-lg border-slate-200 text-sm"></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7" class="px-5 py-12 text-center text-sm font-semibold text-slate-500">Open a PO and click Create Receiving to load receivable lines.</td></tr>
+                                <tr><td colspan="8" class="px-5 py-12 text-center text-sm font-semibold text-slate-500">Open a PO and click Create Receiving to load receivable lines.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

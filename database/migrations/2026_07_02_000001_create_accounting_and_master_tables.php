@@ -41,6 +41,32 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        Schema::create('companies', function (Blueprint $table) {
+            $table->id();
+            $table->string('code')->unique();
+            $table->string('name');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained()->restrictOnDelete();
+            $table->string('code')->unique();
+            $table->string('name');
+            $table->text('address')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        Schema::create('warehouse_types', function (Blueprint $table) {
+            $table->id();
+            $table->string('code')->unique();
+            $table->string('name');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
         Schema::create('items', function (Blueprint $table) {
             $table->id();
             $table->string('sku')->unique();
@@ -48,6 +74,7 @@ return new class extends Migration
             $table->enum('type', ['raw_material', 'packaging_material', 'finished_goods', 'consumable', 'non_stock']);
             $table->foreignId('item_category_id')->constrained()->restrictOnDelete();
             $table->foreignId('unit_of_measure_id')->constrained('units_of_measure')->restrictOnDelete();
+            $table->foreignId('default_warehouse_type_id')->nullable()->constrained('warehouse_types')->nullOnDelete();
             $table->boolean('is_stock_item')->default(true);
             $table->decimal('standard_cost', 18, 4)->default(0);
             $table->foreignId('inventory_account_id')->nullable()->constrained('accounting_accounts')->nullOnDelete();
@@ -89,9 +116,12 @@ return new class extends Migration
 
         Schema::create('warehouses', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('company_id')->constrained()->restrictOnDelete();
+            $table->foreignId('branch_id')->constrained()->restrictOnDelete();
+            $table->foreignId('warehouse_type_id')->constrained()->restrictOnDelete();
             $table->string('code')->unique();
             $table->string('name');
-            $table->enum('type', ['raw_material', 'packaging', 'production', 'finished_goods', 'reject', 'transit']);
+            $table->string('type')->nullable();
             $table->text('address')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
@@ -104,6 +134,9 @@ return new class extends Migration
         Schema::dropIfExists('customers');
         Schema::dropIfExists('suppliers');
         Schema::dropIfExists('items');
+        Schema::dropIfExists('warehouse_types');
+        Schema::dropIfExists('branches');
+        Schema::dropIfExists('companies');
         Schema::dropIfExists('item_categories');
         Schema::dropIfExists('units_of_measure');
         Schema::dropIfExists('accounting_accounts');
