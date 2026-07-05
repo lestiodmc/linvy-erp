@@ -36,15 +36,18 @@
                     <h3 class="text-base font-black text-slate-950">{{ $title }} List</h3>
                     <p class="mt-1 text-sm text-slate-500">Manage and review records in this module.</p>
                 </div>
-                <div class="flex flex-col gap-2 sm:flex-row">
+                <form method="GET" action="{{ route($route.'.index') }}" class="flex flex-col gap-2 sm:flex-row">
                     <label class="relative block">
                         <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
                         </span>
-                        <input type="search" placeholder="Search in this list..." class="w-full rounded-xl border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-700 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500 sm:w-72">
+                        <input type="search" name="search" value="{{ request('search') }}" placeholder="Search in this list..." class="w-full rounded-xl border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-700 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500 sm:w-72">
                     </label>
-                    <button type="button" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Filter</button>
-                </div>
+                    <button type="submit" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Filter</button>
+                    @if(request()->filled('search'))
+                        <a href="{{ route($route.'.index') }}" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-white">Reset</a>
+                    @endif
+                </form>
             </div>
 
             <div class="overflow-x-auto">
@@ -52,7 +55,7 @@
                     <thead class="bg-slate-50">
                         <tr>
                             @foreach($columns as $column)
-                                <th class="px-5 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500">{{ str($column)->afterLast('.')->replace('_', ' ')->title() }}</th>
+                                <th class="px-5 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500">{{ $columnLabels[$column] ?? str($column)->afterLast('.')->replace('_', ' ')->title() }}</th>
                             @endforeach
                             <th class="w-32 px-5 py-3 text-right text-xs font-black uppercase tracking-wide text-slate-500">Action</th>
                         </tr>
@@ -61,10 +64,15 @@
                         @forelse($records as $record)
                             <tr class="hover:bg-slate-50/80">
                                 @foreach($columns as $column)
-                                    @php $cellValue = data_get($record, $column); @endphp
+                                    @php
+                                        $cellValue = data_get($record, $column);
+                                        $badgeText = is_bool($cellValue)
+                                            ? (str($column)->contains('is_active') ? ($cellValue ? 'active' : 'inactive') : ($cellValue ? 'yes' : 'no'))
+                                            : str($cellValue)->replace('_', ' ');
+                                    @endphp
                                     <td class="whitespace-nowrap px-5 py-4 text-slate-700">
-                                        @if(str($column)->contains('status') || str($column)->contains('is_active'))
-                                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-black capitalize ring-1 {{ $badgeClass($cellValue) }}">{{ is_bool($cellValue) ? ($cellValue ? 'active' : 'inactive') : str($cellValue)->replace('_', ' ') }}</span>
+                                        @if(is_bool($cellValue) || str($column)->contains('status') || str($column)->contains('is_active') || str($column)->startsWith('allow_'))
+                                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-black capitalize ring-1 {{ $badgeClass($cellValue) }}">{{ $badgeText }}</span>
                                         @else
                                             {{ is_array($cellValue) ? implode(', ', $cellValue) : $cellValue }}
                                         @endif

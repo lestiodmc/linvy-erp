@@ -2,23 +2,25 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Models\WarehouseType;
+use App\Models\Brand;
 
-class WarehouseTypeController extends ResourceController
+class BrandController extends ResourceController
 {
-    protected string $model = WarehouseType::class;
-    protected string $route = 'warehouse-types';
-    protected string $title = 'Warehouse Type';
-    protected string $viewPath = 'master.warehouse-types';
-    protected array $columns = ['code', 'name', 'is_active'];
+    protected string $model = Brand::class;
+    protected string $route = 'brands';
+    protected string $title = 'Brand';
+    protected string $viewPath = 'master.brands';
+    protected array $columns = ['code', 'name', 'description', 'is_active'];
     protected array $fields = [
         'code' => ['label' => 'Code', 'type' => 'text'],
         'name' => ['label' => 'Name', 'type' => 'text'],
+        'description' => ['label' => 'Description', 'type' => 'textarea'],
         'is_active' => ['label' => 'Active', 'type' => 'checkbox'],
     ];
     protected array $rules = [
         'code' => ['required', 'string', 'max:255'],
         'name' => ['required', 'string', 'max:255'],
+        'description' => ['nullable', 'string'],
         'is_active' => ['nullable'],
     ];
 }

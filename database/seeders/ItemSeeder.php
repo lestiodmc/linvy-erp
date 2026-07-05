@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\Brand;
+use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\WarehouseType;
 use Illuminate\Database\Seeder;
@@ -14,6 +16,8 @@ class ItemSeeder extends Seeder
     {
         $categories = ItemCategory::pluck('id', 'code');
         $units = UnitOfMeasure::pluck('id', 'code');
+        $brands = Brand::pluck('id', 'code');
+        $suppliers = Supplier::pluck('id', 'code');
         $warehouseTypes = WarehouseType::pluck('id', 'code');
 
         $items = [
@@ -54,8 +58,28 @@ class ItemSeeder extends Seeder
                 'name' => $name,
                 'type' => $type,
                 'item_category_id' => $categories[$categoryCode],
+                'brand_id' => $brands['NOBRAND'] ?? null,
+                'item_type' => $this->itemType($type),
                 'unit_of_measure_id' => $units[$unitCode],
+                'base_unit_id' => $units[$unitCode],
+                'purchase_unit_id' => $units[$unitCode],
+                'sales_unit_id' => $units[$unitCode],
                 'default_warehouse_type_id' => $warehouseTypes[$this->warehouseTypeCode($type)] ?? null,
+                'track_inventory' => $type !== 'non_stock',
+                'allow_negative_stock' => false,
+                'is_batch_tracked' => in_array($type, ['raw_material', 'finished_goods'], true),
+                'is_serial_tracked' => false,
+                'has_expiry_date' => in_array($type, ['raw_material', 'finished_goods'], true),
+                'default_supplier_id' => str_starts_with($sku, 'RM') ? ($suppliers['SUP001'] ?? null) : null,
+                'purchase_price' => $standardCost,
+                'minimum_order_qty' => 0,
+                'lead_time_days' => str_starts_with($sku, 'RM') ? 3 : 0,
+                'blocked_purchase' => str_starts_with($sku, 'FG'),
+                'sales_price' => str_starts_with($sku, 'FG') ? $standardCost * 1.25 : 0,
+                'minimum_sales_qty' => 0,
+                'blocked_sales' => ! str_starts_with($sku, 'FG'),
+                'barcode' => null,
+                'description' => 'PT Linvy Seafood Indonesia demo item',
                 'is_stock_item' => true,
                 'standard_cost' => $standardCost,
                 'is_active' => true,
@@ -73,5 +97,10 @@ class ItemSeeder extends Seeder
             'consumable' => 'CONSUMABLE',
             default => 'RAW_MATERIAL',
         };
+    }
+
+    private function itemType(string $legacyType): string
+    {
+        return $legacyType === 'non_stock' ? 'NON_INVENTORY' : 'INVENTORY';
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Models\AccountingAccount;
 use App\Models\ItemCategory;
+use App\Models\WarehouseType;
 
 class ItemCategoryController extends ResourceController
 {
@@ -11,23 +11,48 @@ class ItemCategoryController extends ResourceController
     protected string $route = 'item-categories';
     protected string $title = 'Item Category';
     protected string $viewPath = 'master.item_categories';
-    protected array $columns = ['code', 'name', 'is_active'];
-    protected array $rules = ['code' => ['required', 'string', 'max:255'], 'name' => ['required', 'string', 'max:255'], 'default_inventory_account_id' => ['nullable', 'integer'], 'default_cogs_account_id' => ['nullable', 'integer'], 'default_sales_account_id' => ['nullable', 'integer'], 'default_purchase_account_id' => ['nullable', 'integer'], 'default_wip_account_id' => ['nullable', 'integer'], 'default_adjustment_account_id' => ['nullable', 'integer'], 'default_waste_account_id' => ['nullable', 'integer'], 'is_active' => ['nullable']];
+    protected array $with = ['defaultWarehouseType'];
+    protected array $columns = ['code', 'name', 'item_type', 'defaultWarehouseType.name', 'allow_purchase', 'allow_sales', 'is_active'];
+    protected array $rules = [
+        'code' => ['required', 'string', 'max:255'],
+        'name' => ['required', 'string', 'max:255'],
+        'item_type' => ['required', 'string', 'in:INVENTORY,NON_INVENTORY,SERVICE'],
+        'default_warehouse_type_id' => ['nullable', 'exists:warehouse_types,id'],
+        'allow_purchase' => ['nullable'],
+        'allow_sales' => ['nullable'],
+        'description' => ['nullable', 'string'],
+        'is_active' => ['nullable'],
+    ];
 
     public function __construct()
     {
-        $accounts = AccountingAccount::orderBy('code')->pluck('name', 'id')->toArray();
+        $this->fields = $this->baseFields();
+    }
+
+    protected function visibleFields(): array
+    {
+        if (request()->routeIs($this->route.'.create') || request()->routeIs($this->route.'.edit')) {
+            return $this->baseFields(
+                WarehouseType::where('is_active', true)->orderBy('name')->pluck('name', 'id')->toArray()
+            );
+        }
+
+        return parent::visibleFields();
+    }
+
+    private function baseFields(array $warehouseTypes = []): array
+    {
         $this->fields = [
             'code' => ['label' => 'Code', 'type' => 'text'],
             'name' => ['label' => 'Name', 'type' => 'text'],
-            'default_inventory_account_id' => ['label' => 'Inventory Account', 'type' => 'select', 'options' => $accounts, 'nullable' => true],
-            'default_cogs_account_id' => ['label' => 'COGS Account', 'type' => 'select', 'options' => $accounts, 'nullable' => true],
-            'default_sales_account_id' => ['label' => 'Sales Account', 'type' => 'select', 'options' => $accounts, 'nullable' => true],
-            'default_purchase_account_id' => ['label' => 'Purchase Account', 'type' => 'select', 'options' => $accounts, 'nullable' => true],
-            'default_wip_account_id' => ['label' => 'WIP Account', 'type' => 'select', 'options' => $accounts, 'nullable' => true],
-            'default_adjustment_account_id' => ['label' => 'Adjustment Account', 'type' => 'select', 'options' => $accounts, 'nullable' => true],
-            'default_waste_account_id' => ['label' => 'Waste Account', 'type' => 'select', 'options' => $accounts, 'nullable' => true],
+            'item_type' => ['label' => 'Item Type', 'type' => 'select', 'options' => ['INVENTORY' => 'Inventory', 'NON_INVENTORY' => 'Non Inventory', 'SERVICE' => 'Service'], 'default' => 'INVENTORY'],
+            'default_warehouse_type_id' => ['label' => 'Default Warehouse Type', 'type' => 'select', 'options' => $warehouseTypes, 'nullable' => true],
+            'allow_purchase' => ['label' => 'Allow Purchase', 'type' => 'checkbox', 'default' => true],
+            'allow_sales' => ['label' => 'Allow Sales', 'type' => 'checkbox', 'default' => false],
+            'description' => ['label' => 'Description', 'type' => 'textarea'],
             'is_active' => ['label' => 'Active', 'type' => 'checkbox'],
         ];
+
+        return $this->fields;
     }
 }

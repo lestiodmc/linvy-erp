@@ -21,7 +21,7 @@ class DashboardController extends Controller
 {
     public function __invoke(): View
     {
-        return view('dashboard.index', [
+        return view('dashboard', [
             'stats' => [
                 'Total Items' => Item::count(),
                 'Total Warehouses' => Warehouse::count(),

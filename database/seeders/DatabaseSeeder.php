@@ -24,13 +24,10 @@ class DatabaseSeeder extends Seeder
             WarehouseSeeder::class,
             UnitSeeder::class,
             ItemCategorySeeder::class,
+            BrandSeeder::class,
             SupplierSeeder::class,
             CustomerSeeder::class,
             ItemSeeder::class,
-            PurchaseRequestSeeder::class,
-            PurchaseOrderSeeder::class,
-            ReceivingSeeder::class,
-            StockMovementSeeder::class,
         ]);
     }
 

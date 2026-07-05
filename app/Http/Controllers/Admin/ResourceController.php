@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 abstract class ResourceController extends Controller
@@ -32,7 +33,10 @@ abstract class ResourceController extends Controller
 
     public function index(): View
     {
-        $records = $this->query()->latest('id')->paginate(15);
+        $records = $this->applySearchFilter($this->query())
+            ->latest('id')
+            ->paginate(15)
+            ->withQueryString();
 
         return view($this->viewName('index'), $this->viewData(compact('records')));
     }
@@ -117,6 +121,30 @@ abstract class ResourceController extends Controller
     protected function query()
     {
         return $this->model::query()->with($this->with);
+    }
+
+    protected function applySearchFilter($query)
+    {
+        $search = trim((string) request('search', ''));
+
+        if ($search === '') {
+            return $query;
+        }
+
+        $table = $query->getModel()->getTable();
+        $searchableColumns = collect(['code', 'sku', 'name', 'description'])
+            ->filter(fn (string $column): bool => Schema::hasColumn($table, $column))
+            ->values();
+
+        if ($searchableColumns->isEmpty()) {
+            return $query;
+        }
+
+        return $query->where(function ($subQuery) use ($search, $searchableColumns): void {
+            foreach ($searchableColumns as $column) {
+                $subQuery->orWhere($column, 'like', '%'.$search.'%');
+            }
+        });
     }
 
     protected function findRecord(int|string $id): Model

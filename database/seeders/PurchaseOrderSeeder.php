@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\Item;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
 use App\Models\PurchaseRequest;
+use App\Models\PurchaseRequestLine;
 use App\Models\Supplier;
 use Illuminate\Database\Seeder;
 
@@ -42,32 +44,30 @@ class PurchaseOrderSeeder extends Seeder
                 ]
             );
 
-            foreach ($record->lines()->whereNotNull('purchase_request_line_id')->get() as $oldLine) {
-                $oldLine->purchaseRequestLine?->decrement('converted_quantity', $oldLine->quantity);
-            }
-
-            $record->lines()->delete();
-
             foreach ($order['lines'] as [$sku, $quantity, $price]) {
                 $item = Item::where('sku', $sku)->firstOrFail();
                 $requestLine = $purchaseRequest?->lines()->where('item_id', $item->id)->first();
                 $subtotal = $quantity * $price;
+                $existingLine = $record->lines()->where('item_id', $item->id)->first();
+                $receivedQuantity = (float) ($existingLine?->received_quantity ?? 0);
 
-                $line = $record->lines()->create([
-                    'purchase_request_line_id' => $requestLine?->id,
-                    'item_id' => $item->id,
-                    'description' => $item->name,
-                    'quantity' => $quantity,
-                    'received_quantity' => 0,
-                    'remaining_quantity' => $quantity,
-                    'unit_id' => $item->unit_of_measure_id,
-                    'unit_price' => $price,
-                    'tax_percent' => 11,
-                    'subtotal' => $subtotal,
-                ]);
-
-                $line->purchaseRequestLine?->increment('converted_quantity', $quantity);
+                $record->lines()->updateOrCreate(
+                    ['item_id' => $item->id],
+                    [
+                        'purchase_request_line_id' => $requestLine?->id,
+                        'description' => $item->name,
+                        'quantity' => $quantity,
+                        'received_quantity' => $receivedQuantity,
+                        'remaining_quantity' => max(0, $quantity - $receivedQuantity),
+                        'unit_id' => $item->unit_of_measure_id,
+                        'unit_price' => $price,
+                        'tax_percent' => 11,
+                        'subtotal' => $subtotal,
+                    ]
+                );
             }
+
+            $this->syncConvertedQuantities($purchaseRequest);
         }
     }
 
@@ -86,5 +86,20 @@ class PurchaseOrderSeeder extends Seeder
     private function number(string $prefix, int $idx): string
     {
         return $prefix.'/'.now()->format('Y').'/'.now()->format('m').'/'.str_pad((string) $idx, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function syncConvertedQuantities(?PurchaseRequest $purchaseRequest): void
+    {
+        if (! $purchaseRequest) {
+            return;
+        }
+
+        foreach ($purchaseRequest->lines as $requestLine) {
+            $convertedQuantity = PurchaseOrderLine::where('purchase_request_line_id', $requestLine->id)->sum('quantity');
+
+            PurchaseRequestLine::whereKey($requestLine->id)->update([
+                'converted_quantity' => $convertedQuantity,
+            ]);
+        }
     }
 }

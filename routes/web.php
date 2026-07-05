@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AccountingAccountController;
 use App\Http\Controllers\Admin\AccountMappingController;
+use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\BranchController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\CustomerController;
@@ -44,6 +45,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('companies', CompanyController::class)->parameters(['companies' => 'record']);
         Route::resource('branches', BranchController::class)->parameters(['branches' => 'record']);
         Route::resource('warehouse-types', WarehouseTypeController::class)->parameters(['warehouse-types' => 'record']);
+        Route::resource('brands', BrandController::class)->parameters(['brands' => 'record']);
         Route::resource('units-of-measure', UnitOfMeasureController::class)->parameters(['units-of-measure' => 'record']);
         Route::resource('item-categories', ItemCategoryController::class)->parameters(['item-categories' => 'record']);
         Route::resource('items', ItemController::class)->parameters(['items' => 'record']);

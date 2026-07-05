@@ -29,6 +29,7 @@ return [
                 ['label' => 'Companies', 'route' => 'companies.index', 'routes' => ['companies.*']],
                 ['label' => 'Branches', 'route' => 'branches.index', 'routes' => ['branches.*']],
                 ['label' => 'Warehouse Types', 'route' => 'warehouse-types.index', 'routes' => ['warehouse-types.*']],
+                ['label' => 'Brands', 'route' => 'brands.index', 'routes' => ['brands.*']],
                 ['label' => 'Items', 'route' => 'items.index', 'routes' => ['items.*']],
                 ['label' => 'Item Categories', 'route' => 'item-categories.index', 'routes' => ['item-categories.*']],
                 ['label' => 'Unit of Measure', 'route' => 'units-of-measure.index', 'routes' => ['units-of-measure.*']],
