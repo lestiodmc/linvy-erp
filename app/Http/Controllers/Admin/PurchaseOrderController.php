@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
@@ -41,6 +42,8 @@ class PurchaseOrderController extends Controller
         $purchaseRequest->load(['lines.item', 'lines.unit']);
         $record = new PurchaseOrder([
             'purchase_request_id' => $purchaseRequest->id,
+            'company_id' => $purchaseRequest->company_id,
+            'branch_id' => $purchaseRequest->branch_id,
             'order_date' => now()->toDateString(),
             'status' => 'draft',
         ]);
@@ -81,11 +84,17 @@ class PurchaseOrderController extends Controller
                 if (! blank($data['purchase_request_id'] ?? null)) {
                     $purchaseRequest = PurchaseRequest::with('lines')->lockForUpdate()->findOrFail($data['purchase_request_id']);
                     abort_if($purchaseRequest->status !== 'approved', 422, 'Only approved purchase requests can be converted to purchase orders.');
+                    $data['company_id'] = $purchaseRequest->company_id;
+                    $data['branch_id'] = $purchaseRequest->branch_id;
+                } else {
+                    $branch = $this->currentBranch();
+                    $data['company_id'] = $branch?->company_id;
+                    $data['branch_id'] = $branch?->id;
                 }
 
                 $totals = $this->totals($lines);
                 $record = PurchaseOrder::create($data + [
-                    'number' => app(DocumentSequenceService::class)->generate('PURCHASE_ORDER'),
+                    'number' => app(DocumentSequenceService::class)->generate('PURCHASE_ORDER', $data['company_id'], $data['branch_id']),
                     'status' => 'draft',
                     'subtotal' => $totals['subtotal'],
                     'tax_total' => $totals['tax_total'],
@@ -298,11 +307,17 @@ class PurchaseOrderController extends Controller
     private function setStatus(PurchaseOrder $record, string $status, string $action): void
     {
         DB::transaction(function () use ($record, $status, $action): void {
+            $record = PurchaseOrder::whereKey($record->id)->lockForUpdate()->firstOrFail();
             $record->update(['status' => $status]);
             $record->approvalLogs()->create([
                 'action' => $action,
                 'user_id' => Auth::id(),
             ]);
         });
+    }
+
+    private function currentBranch(): ?Branch
+    {
+        return Branch::where('is_active', true)->orderBy('id')->first();
     }
 }

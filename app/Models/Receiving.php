@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Receiving extends Model
 {
@@ -32,5 +33,10 @@ class Receiving extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(ReceivingLine::class);
+    }
+
+    public function approvalLogs(): MorphMany
+    {
+        return $this->morphMany(ApprovalLog::class, 'approvable');
     }
 }

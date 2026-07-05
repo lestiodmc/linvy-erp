@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Item;
 use App\Models\PurchaseRequest;
 use App\Models\UnitOfMeasure;
@@ -40,7 +41,10 @@ class PurchaseRequestController extends Controller
                 $data = $this->validated($request);
                 $lines = $data['lines'];
                 unset($data['lines']);
-                $data['number'] = app(DocumentSequenceService::class)->generate('PURCHASE_REQUEST');
+                $branch = $this->currentBranch();
+                $data['company_id'] = $branch?->company_id;
+                $data['branch_id'] = $branch?->id;
+                $data['number'] = app(DocumentSequenceService::class)->generate('PURCHASE_REQUEST', $data['company_id'], $data['branch_id']);
                 $data['status'] = 'draft';
                 $data['requested_by'] = Auth::id();
 
@@ -218,11 +222,17 @@ class PurchaseRequestController extends Controller
     private function setStatus(PurchaseRequest $record, string $status, string $action): void
     {
         DB::transaction(function () use ($record, $status, $action): void {
+            $record = PurchaseRequest::whereKey($record->id)->lockForUpdate()->firstOrFail();
             $record->update(['status' => $status]);
             $record->approvalLogs()->create([
                 'action' => $action,
                 'user_id' => Auth::id(),
             ]);
         });
+    }
+
+    private function currentBranch(): ?Branch
+    {
+        return Branch::where('is_active', true)->orderBy('id')->first();
     }
 }

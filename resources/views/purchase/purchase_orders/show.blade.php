@@ -35,7 +35,7 @@
                     </form>
                 @endif
 
-                @if(in_array($record->status, ['approved', 'partially_received'], true))
+                @if(in_array($record->status, ['approved', 'partially_received'], true) && $record->lines->contains(fn ($line) => (float) $line->remaining_quantity > 0))
                     <a href="{{ route('receivings.create-from-po', $record) }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Create Receiving</a>
                 @endif
 

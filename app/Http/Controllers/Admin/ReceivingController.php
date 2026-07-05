@@ -58,7 +58,9 @@ class ReceivingController extends Controller
                 $legacyWarehouseId = $lines[0]['warehouse_id'] ?? null;
 
                 $record = Receiving::create($data + [
-                    'number' => app(DocumentSequenceService::class)->generate('GOODS_RECEIPT'),
+                    'company_id' => $purchaseOrder->company_id,
+                    'branch_id' => $purchaseOrder->branch_id,
+                    'number' => app(DocumentSequenceService::class)->generate('GOODS_RECEIPT', $purchaseOrder->company_id, $purchaseOrder->branch_id),
                     'supplier_id' => $purchaseOrder->supplier_id,
                     'warehouse_id' => $legacyWarehouseId,
                     'status' => 'draft',
@@ -84,7 +86,7 @@ class ReceivingController extends Controller
     public function show(Receiving $record): View
     {
         return view('purchase.receivings.show', [
-            'record' => $record->load(['purchaseOrder', 'supplier', 'lines.item', 'lines.unit', 'lines.warehouse.branch', 'lines.purchaseOrderLine']),
+            'record' => $record->load(['purchaseOrder', 'supplier', 'lines.item', 'lines.unit', 'lines.warehouse.branch', 'lines.purchaseOrderLine', 'approvalLogs.user']),
         ]);
     }
 
@@ -108,7 +110,12 @@ class ReceivingController extends Controller
             $this->ensureReceivable($purchaseOrder);
             $legacyWarehouseId = $lines[0]['warehouse_id'] ?? null;
 
-            $record->update($data + ['supplier_id' => $purchaseOrder->supplier_id, 'warehouse_id' => $legacyWarehouseId]);
+            $record->update($data + [
+                'company_id' => $purchaseOrder->company_id,
+                'branch_id' => $purchaseOrder->branch_id,
+                'supplier_id' => $purchaseOrder->supplier_id,
+                'warehouse_id' => $legacyWarehouseId,
+            ]);
             $this->syncLines($record, $purchaseOrder, $lines);
         });
 
@@ -125,10 +132,11 @@ class ReceivingController extends Controller
 
     public function post(Receiving $record): RedirectResponse
     {
-        abort_if($record->status !== 'draft', 422, 'Only draft receiving can be posted.');
-
         DB::transaction(function () use ($record): void {
-            $record->load(['purchaseOrder.lines', 'lines']);
+            $record = Receiving::whereKey($record->id)->lockForUpdate()->firstOrFail();
+            abort_if($record->status !== 'draft', 422, 'Only draft receiving can be posted.');
+
+            $record->load(['purchaseOrder.lines', 'lines.item']);
             $purchaseOrder = PurchaseOrder::whereKey($record->purchase_order_id)->lockForUpdate()->firstOrFail();
             $this->ensureReceivable($purchaseOrder);
 
@@ -148,26 +156,32 @@ class ReceivingController extends Controller
                     'remaining_quantity' => max(0, (float) $poLine->quantity - $newReceivedQuantity),
                 ]);
 
-                StockMovement::create([
-                    'item_id' => $line->item_id,
-                    'warehouse_id' => $line->warehouse_id,
-                    'movement_type' => 'PURCHASE_RECEIVE',
-                    'quantity_in' => $line->received_quantity,
-                    'quantity_out' => 0,
-                    'unit_cost' => $line->unit_cost,
-                    'total_cost' => (float) $line->received_quantity * (float) $line->unit_cost,
-                    'reference_type' => Receiving::class,
-                    'reference_id' => $record->id,
-                    'reference_number' => $record->number,
-                    'movement_date' => $record->received_date,
-                    'notes' => $line->notes,
-                    'created_by' => Auth::id(),
-                ]);
+                if ((bool) ($line->item?->track_inventory ?? true)) {
+                    StockMovement::create([
+                        'item_id' => $line->item_id,
+                        'warehouse_id' => $line->warehouse_id,
+                        'movement_type' => 'PURCHASE_RECEIVE',
+                        'quantity_in' => $line->received_quantity,
+                        'quantity_out' => 0,
+                        'unit_cost' => $line->unit_cost,
+                        'total_cost' => (float) $line->received_quantity * (float) $line->unit_cost,
+                        'reference_type' => Receiving::class,
+                        'reference_id' => $record->id,
+                        'reference_number' => $record->number,
+                        'movement_date' => $record->received_date,
+                        'notes' => $line->notes,
+                        'created_by' => Auth::id(),
+                    ]);
 
-                $this->updateStockBalance($line->item_id, $line->warehouse_id, (float) $line->received_quantity, (float) $line->unit_cost, $record->received_date);
+                    $this->updateStockBalance($line->item_id, $line->warehouse_id, (float) $line->received_quantity, (float) $line->unit_cost, $record->received_date);
+                }
             }
 
             $record->update(['status' => 'posted']);
+            $record->approvalLogs()->create([
+                'action' => 'post',
+                'user_id' => Auth::id(),
+            ]);
             $this->refreshPurchaseOrderStatus($purchaseOrder->fresh('lines'));
         });
 
@@ -176,8 +190,21 @@ class ReceivingController extends Controller
 
     public function cancel(Receiving $record): RedirectResponse
     {
-        abort_if($record->status === 'posted', 422, 'Posted receiving cannot be cancelled.');
-        $record->update(['status' => 'cancelled']);
+        if ($record->status === 'posted') {
+            return back()->withErrors([
+                'status' => 'Receiving yang sudah posted tidak dapat dibatalkan karena stok sudah masuk. Buat fitur reversal terlebih dahulu.',
+            ]);
+        }
+
+        DB::transaction(function () use ($record): void {
+            $record = Receiving::whereKey($record->id)->lockForUpdate()->firstOrFail();
+            abort_if($record->status !== 'draft', 422, 'Only draft receiving can be cancelled.');
+            $record->update(['status' => 'cancelled']);
+            $record->approvalLogs()->create([
+                'action' => 'cancel',
+                'user_id' => Auth::id(),
+            ]);
+        });
 
         return back()->with('status', 'Receiving cancelled.');
     }
@@ -187,15 +214,25 @@ class ReceivingController extends Controller
         $purchaseOrder->load(['supplier', 'lines.item.defaultWarehouseType', 'lines.unit']);
         $this->ensureReceivable($purchaseOrder);
         $branch = $this->currentBranch();
+        $headerWarehouseId = Warehouse::where('is_active', true)
+            ->when($branch, fn ($query) => $query->where('branch_id', $branch->id))
+            ->orderBy('id')
+            ->value('id') ?: Warehouse::where('is_active', true)->orderBy('id')->value('id');
 
         $record = new Receiving([
             'purchase_order_id' => $purchaseOrder->id,
+            'company_id' => $purchaseOrder->company_id,
+            'branch_id' => $purchaseOrder->branch_id,
             'supplier_id' => $purchaseOrder->supplier_id,
+            'warehouse_id' => $headerWarehouseId,
             'received_date' => now()->toDateString(),
             'status' => 'draft',
         ]);
 
-        $record->setRelation('lines', $purchaseOrder->lines->where('remaining_quantity', '>', 0)->map(function ($line) use ($branch) {
+        $receivableLines = $purchaseOrder->lines->where('remaining_quantity', '>', 0)->values();
+        abort_if($receivableLines->isEmpty(), 422, 'No remaining PO quantity can be received.');
+
+        $record->setRelation('lines', $receivableLines->map(function ($line) use ($branch, $headerWarehouseId) {
             return new \App\Models\ReceivingLine([
                 'purchase_order_line_id' => $line->id,
                 'item_id' => $line->item_id,
@@ -204,7 +241,7 @@ class ReceivingController extends Controller
                 'previously_received_quantity' => $line->received_quantity,
                 'received_quantity' => $line->remaining_quantity,
                 'remaining_quantity' => 0,
-                'warehouse_id' => $this->suggestWarehouseId($line->item, $branch),
+                'warehouse_id' => $this->suggestWarehouseId($line->item, $branch, $headerWarehouseId),
                 'unit_id' => $line->unit_id,
                 'unit_cost' => $line->unit_price,
             ]);
@@ -312,12 +349,16 @@ class ReceivingController extends Controller
         return Branch::where('is_active', true)->orderBy('id')->first();
     }
 
-    private function suggestWarehouseId(?\App\Models\Item $item, ?Branch $branch): ?int
+    private function suggestWarehouseId(?\App\Models\Item $item, ?Branch $branch, ?int $fallbackWarehouseId = null): ?int
     {
+        if ($item && array_key_exists('default_warehouse_id', $item->getAttributes()) && $item->getAttribute('default_warehouse_id')) {
+            return (int) $item->getAttribute('default_warehouse_id');
+        }
+
         $warehouseTypeId = $item?->default_warehouse_type_id;
 
         if (! $warehouseTypeId) {
-            return Warehouse::where('is_active', true)->orderBy('id')->value('id');
+            return $fallbackWarehouseId ?: Warehouse::where('is_active', true)->orderBy('id')->value('id');
         }
 
         $query = Warehouse::where('is_active', true)->where('warehouse_type_id', $warehouseTypeId);
@@ -330,7 +371,7 @@ class ReceivingController extends Controller
             }
         }
 
-        return $query->orderBy('id')->value('id');
+        return $query->orderBy('id')->value('id') ?: $fallbackWarehouseId;
     }
 
     private function refreshPurchaseOrderStatus(PurchaseOrder $purchaseOrder): void
