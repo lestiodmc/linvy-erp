@@ -9,12 +9,12 @@
     @php
         $value = fn (string $name, mixed $default = null) => old($name, $record ? data_get($record, $name) : ($fields[$name]['default'] ?? $default));
         $sections = [
-            'General Information' => ['sku', 'name', 'item_category_id', 'brand_id', 'barcode', 'description'],
-            'Item Setup' => ['item_type', 'default_warehouse_type_id', 'is_active'],
+            'General Information' => ['sku', 'name', 'item_category_id', 'brand_id', 'item_type'],
             'Unit of Measure' => ['base_unit_id', 'purchase_unit_id', 'sales_unit_id'],
+            'Warehouse Default' => ['default_warehouse_type_id'],
             'Inventory' => ['track_inventory', 'allow_negative_stock', 'is_batch_tracked', 'is_serial_tracked', 'has_expiry_date'],
-            'Purchase' => ['default_supplier_id', 'purchase_price', 'minimum_order_qty', 'lead_time_days', 'blocked_purchase'],
-            'Sales' => ['sales_price', 'minimum_sales_qty', 'blocked_sales'],
+            'Cost and Price' => ['purchase_price', 'sales_price', 'cost_method', 'standard_cost'],
+            'Status' => ['is_active'],
         ];
     @endphp
 
@@ -32,16 +32,12 @@
 
                     const itemType = option.dataset.itemType || '';
                     const warehouseTypeId = option.dataset.warehouseTypeId || '';
-                    const allowPurchase = option.dataset.allowPurchase === '1';
-                    const allowSales = option.dataset.allowSales === '1';
 
                     if (itemType) {
                         this.$refs.itemType.value = itemType;
                     }
 
                     this.$refs.defaultWarehouseType.value = warehouseTypeId;
-                    this.$refs.blockedPurchase.checked = !allowPurchase;
-                    this.$refs.blockedSales.checked = !allowSales;
                 }
             }"
             class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -80,8 +76,6 @@
                                                 name="{{ $name }}"
                                                 value="1"
                                                 @checked((bool) $currentValue)
-                                                @if($name === 'blocked_purchase') x-ref="blockedPurchase" @endif
-                                                @if($name === 'blocked_sales') x-ref="blockedSales" @endif
                                                 class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-600"
                                             >
                                             {{ $field['label'] }}
@@ -108,8 +102,6 @@
                                                             value="{{ $category->id }}"
                                                             data-item-type="{{ $category->item_type }}"
                                                             data-warehouse-type-id="{{ $category->default_warehouse_type_id }}"
-                                                            data-allow-purchase="{{ $category->allow_purchase ? '1' : '0' }}"
-                                                            data-allow-sales="{{ $category->allow_sales ? '1' : '0' }}"
                                                             @selected((string) $currentValue === (string) $category->id)
                                                         >{{ $category->name }}</option>
                                                     @endforeach
