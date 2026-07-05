@@ -9,7 +9,8 @@ use App\Models\Receiving;
 use App\Models\StockBalance;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
-use App\Services\DocumentNumberService;
+use App\Services\DocumentSequenceService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -46,26 +47,36 @@ class ReceivingController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $record = DB::transaction(function () use ($request): Receiving {
-            $data = $this->validated($request);
-            $lines = $data['lines'];
-            unset($data['lines']);
+        try {
+            $record = DB::transaction(function () use ($request): Receiving {
+                $data = $this->validated($request);
+                $lines = $data['lines'];
+                unset($data['lines']);
 
-            $purchaseOrder = PurchaseOrder::with('lines')->lockForUpdate()->findOrFail($data['purchase_order_id']);
-            $this->ensureReceivable($purchaseOrder);
-            $legacyWarehouseId = $lines[0]['warehouse_id'] ?? null;
+                $purchaseOrder = PurchaseOrder::with('lines')->lockForUpdate()->findOrFail($data['purchase_order_id']);
+                $this->ensureReceivable($purchaseOrder);
+                $legacyWarehouseId = $lines[0]['warehouse_id'] ?? null;
 
-            $record = Receiving::create($data + [
-                'number' => app(DocumentNumberService::class)->generate('RCV'),
-                'supplier_id' => $purchaseOrder->supplier_id,
-                'warehouse_id' => $legacyWarehouseId,
-                'status' => 'draft',
-            ]);
+                $record = Receiving::create($data + [
+                    'number' => app(DocumentSequenceService::class)->generate('GOODS_RECEIPT'),
+                    'supplier_id' => $purchaseOrder->supplier_id,
+                    'warehouse_id' => $legacyWarehouseId,
+                    'status' => 'draft',
+                ]);
 
-            $this->syncLines($record, $purchaseOrder, $lines);
+                $this->syncLines($record, $purchaseOrder, $lines);
 
-            return $record;
-        });
+                return $record;
+            });
+        } catch (QueryException $exception) {
+            if ((string) $exception->getCode() === '23000') {
+                return back()
+                    ->withInput()
+                    ->withErrors(['number' => 'Nomor dokumen sudah digunakan. Silakan ulangi proses.']);
+            }
+
+            throw $exception;
+        }
 
         return redirect()->route('receivings.show', $record)->with('status', 'Receiving dibuat.');
     }

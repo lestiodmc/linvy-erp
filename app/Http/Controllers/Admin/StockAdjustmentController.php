@@ -11,7 +11,7 @@ class StockAdjustmentController extends ResourceController
     protected string $route = 'stock-adjustments';
     protected string $title = 'Stock Adjustment';
     protected string $viewPath = 'inventory.stock_adjustments';
-    protected ?string $documentType = 'ADJ';
+    protected ?string $documentType = 'STOCK_ADJUSTMENT';
     protected array $with = ['warehouse'];
     protected array $columns = ['number', 'warehouse.name', 'adjustment_date', 'status', 'reason'];
     protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'warehouse_id' => ['required', 'integer'], 'adjustment_date' => ['required', 'date'], 'status' => ['required', 'string'], 'reason' => ['nullable', 'string'], 'notes' => ['nullable', 'string']];

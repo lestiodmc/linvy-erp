@@ -2,9 +2,7 @@
     $columnLabels = [
         'code' => 'Code',
         'name' => 'Name',
-        'customer_type' => 'Type',
-        'billing_city' => 'City',
-        'phone' => 'Phone',
+        'due_days' => 'Due Days',
         'is_active' => 'Active',
     ];
 @endphp

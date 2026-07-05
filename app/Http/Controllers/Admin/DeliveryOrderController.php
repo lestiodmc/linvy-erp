@@ -13,7 +13,7 @@ class DeliveryOrderController extends ResourceController
     protected string $route = 'delivery-orders';
     protected string $title = 'Delivery Order';
     protected string $viewPath = 'sales.delivery_orders';
-    protected ?string $documentType = 'DO';
+    protected ?string $documentType = 'DELIVERY_ORDER';
     protected array $with = ['customer', 'warehouse'];
     protected array $columns = ['number', 'customer.name', 'warehouse.name', 'delivery_date', 'status', 'vehicle_number'];
     protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'sales_order_id' => ['nullable', 'integer'], 'customer_id' => ['required', 'integer'], 'warehouse_id' => ['required', 'integer'], 'delivery_date' => ['required', 'date'], 'status' => ['required', 'string'], 'vehicle_number' => ['nullable', 'string'], 'driver_name' => ['nullable', 'string'], 'shipping_address' => ['nullable', 'string'], 'notes' => ['nullable', 'string']];

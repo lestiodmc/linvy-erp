@@ -11,7 +11,7 @@ class WarehouseTransferController extends ResourceController
     protected string $route = 'warehouse-transfers';
     protected string $title = 'Warehouse Transfer';
     protected string $viewPath = 'inventory.warehouse_transfers';
-    protected ?string $documentType = 'TRF';
+    protected ?string $documentType = 'WAREHOUSE_TRANSFER';
     protected array $with = ['fromWarehouse', 'toWarehouse'];
     protected array $columns = ['number', 'fromWarehouse.name', 'toWarehouse.name', 'transfer_date', 'status'];
     protected array $rules = ['number' => ['nullable', 'string', 'max:255'], 'from_warehouse_id' => ['required', 'integer'], 'to_warehouse_id' => ['required', 'integer'], 'transfer_date' => ['required', 'date'], 'status' => ['required', 'string'], 'notes' => ['nullable', 'string']];

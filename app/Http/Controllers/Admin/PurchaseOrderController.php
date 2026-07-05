@@ -8,7 +8,8 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
-use App\Services\DocumentNumberService;
+use App\Services\DocumentSequenceService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -71,29 +72,39 @@ class PurchaseOrderController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $record = DB::transaction(function () use ($request): PurchaseOrder {
-            $data = $this->validated($request);
-            $lines = $data['lines'];
-            unset($data['lines']);
+        try {
+            $record = DB::transaction(function () use ($request): PurchaseOrder {
+                $data = $this->validated($request);
+                $lines = $data['lines'];
+                unset($data['lines']);
 
-            if (! blank($data['purchase_request_id'] ?? null)) {
-                $purchaseRequest = PurchaseRequest::with('lines')->lockForUpdate()->findOrFail($data['purchase_request_id']);
-                abort_if($purchaseRequest->status !== 'approved', 422, 'Only approved purchase requests can be converted to purchase orders.');
+                if (! blank($data['purchase_request_id'] ?? null)) {
+                    $purchaseRequest = PurchaseRequest::with('lines')->lockForUpdate()->findOrFail($data['purchase_request_id']);
+                    abort_if($purchaseRequest->status !== 'approved', 422, 'Only approved purchase requests can be converted to purchase orders.');
+                }
+
+                $totals = $this->totals($lines);
+                $record = PurchaseOrder::create($data + [
+                    'number' => app(DocumentSequenceService::class)->generate('PURCHASE_ORDER'),
+                    'status' => 'draft',
+                    'subtotal' => $totals['subtotal'],
+                    'tax_total' => $totals['tax_total'],
+                    'grand_total' => $totals['grand_total'],
+                ]);
+
+                $this->syncLines($record, $lines);
+
+                return $record;
+            });
+        } catch (QueryException $exception) {
+            if ((string) $exception->getCode() === '23000') {
+                return back()
+                    ->withInput()
+                    ->withErrors(['number' => 'Nomor dokumen sudah digunakan. Silakan ulangi proses.']);
             }
 
-            $totals = $this->totals($lines);
-            $record = PurchaseOrder::create($data + [
-                'number' => app(DocumentNumberService::class)->generate('PO'),
-                'status' => 'draft',
-                'subtotal' => $totals['subtotal'],
-                'tax_total' => $totals['tax_total'],
-                'grand_total' => $totals['grand_total'],
-            ]);
-
-            $this->syncLines($record, $lines);
-
-            return $record;
-        });
+            throw $exception;
+        }
 
         return redirect()->route('purchase-orders.show', $record)->with('status', 'Purchase order dibuat.');
     }

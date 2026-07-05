@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\AccountingAccount;
+use App\Models\Currency;
+use App\Models\PaymentTerm;
 use App\Models\Supplier;
+use App\Models\Tax;
 
 class SupplierController extends ResourceController
 {
@@ -28,10 +31,10 @@ class SupplierController extends ResourceController
         'province' => ['nullable', 'string', 'max:255'],
         'country' => ['nullable', 'string', 'max:255'],
         'postal_code' => ['nullable', 'string', 'max:255'],
-        'default_currency_id' => ['nullable', 'integer', 'min:1'],
-        'payment_term_id' => ['nullable', 'integer', 'min:1'],
+        'default_currency_id' => ['nullable', 'exists:currencies,id'],
+        'payment_term_id' => ['nullable', 'exists:payment_terms,id'],
         'lead_time_days' => ['nullable', 'integer', 'min:0'],
-        'default_tax_id' => ['nullable', 'integer', 'min:1'],
+        'default_tax_id' => ['nullable', 'exists:taxes,id'],
         'ap_account_id' => ['nullable', 'exists:accounting_accounts,id'],
         'blocked_purchase' => ['nullable'],
         'is_active' => ['nullable'],
@@ -46,6 +49,9 @@ class SupplierController extends ResourceController
     {
         if (request()->routeIs($this->route.'.create') || request()->routeIs($this->route.'.edit')) {
             return $this->baseFields(
+                Currency::where('is_active', true)->orderBy('code')->pluck('code', 'id')->toArray(),
+                PaymentTerm::where('is_active', true)->orderBy('due_days')->orderBy('code')->pluck('name', 'id')->toArray(),
+                Tax::where('is_active', true)->orderBy('code')->pluck('name', 'id')->toArray(),
                 AccountingAccount::where('is_active', true)->orderBy('code')->pluck('name', 'id')->toArray()
             );
         }
@@ -53,7 +59,7 @@ class SupplierController extends ResourceController
         return parent::visibleFields();
     }
 
-    private function baseFields(array $apAccounts = []): array
+    private function baseFields(array $currencies = [], array $paymentTerms = [], array $taxes = [], array $apAccounts = []): array
     {
         $supplierTypes = array_combine(Supplier::TYPES, Supplier::TYPES);
 
@@ -73,10 +79,10 @@ class SupplierController extends ResourceController
             'province' => ['label' => 'Province', 'type' => 'text'],
             'country' => ['label' => 'Country', 'type' => 'text'],
             'postal_code' => ['label' => 'Postal Code', 'type' => 'text'],
-            'default_currency_id' => ['label' => 'Default Currency ID', 'type' => 'number', 'step' => '1'],
-            'payment_term_id' => ['label' => 'Payment Term ID', 'type' => 'number', 'step' => '1'],
+            'default_currency_id' => ['label' => 'Default Currency', 'type' => 'select', 'options' => $currencies, 'nullable' => true],
+            'payment_term_id' => ['label' => 'Payment Term', 'type' => 'select', 'options' => $paymentTerms, 'nullable' => true],
             'lead_time_days' => ['label' => 'Lead Time Days', 'type' => 'number', 'step' => '1', 'default' => 0],
-            'default_tax_id' => ['label' => 'Default Tax ID', 'type' => 'number', 'step' => '1'],
+            'default_tax_id' => ['label' => 'Default Tax', 'type' => 'select', 'options' => $taxes, 'nullable' => true],
             'ap_account_id' => ['label' => 'AP Account', 'type' => 'select', 'options' => $apAccounts, 'nullable' => true],
             'blocked_purchase' => ['label' => 'Blocked Purchase', 'type' => 'checkbox'],
             'is_active' => ['label' => 'Active', 'type' => 'checkbox', 'default' => true],

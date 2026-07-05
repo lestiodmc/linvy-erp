@@ -52,4 +52,19 @@ class Supplier extends Model
     {
         return $this->belongsTo(AccountingAccount::class, 'ap_account_id');
     }
+
+    public function defaultCurrency(): BelongsTo
+    {
+        return $this->belongsTo(Currency::class, 'default_currency_id');
+    }
+
+    public function paymentTerm(): BelongsTo
+    {
+        return $this->belongsTo(PaymentTerm::class);
+    }
+
+    public function defaultTax(): BelongsTo
+    {
+        return $this->belongsTo(Tax::class, 'default_tax_id');
+    }
 }

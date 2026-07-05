@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\DocumentNumberService;
+use App\Services\DocumentSequenceService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,8 @@ abstract class ResourceController extends Controller
     protected array $rules = [];
 
     protected array $with = [];
+
+    protected array $searchableColumns = [];
 
     protected string $viewPath = '';
 
@@ -52,15 +55,29 @@ abstract class ResourceController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $record = DB::transaction(function () use ($request): Model {
-            $data = $this->validated($request);
+        try {
+            $record = DB::transaction(function () use ($request): Model {
+                $data = $this->validated($request);
 
-            if ($this->documentType && blank($data['number'] ?? null)) {
-                $data['number'] = app(DocumentNumberService::class)->generate($this->documentType);
+                if ($this->documentType && blank($data['number'] ?? null)) {
+                    $data['number'] = app(DocumentSequenceService::class)->generate($this->documentType);
+                }
+
+                return $this->model::create($data);
+            });
+        } catch (QueryException $exception) {
+            if ((string) $exception->getCode() === '23000') {
+                $message = $this->documentType
+                    ? 'Nomor dokumen sudah digunakan. Silakan ulangi proses.'
+                    : 'Data dengan nilai unik tersebut sudah digunakan.';
+
+                return back()
+                    ->withInput()
+                    ->withErrors([$this->documentType ? 'number' : 'code' => $message]);
             }
 
-            return $this->model::create($data);
-        });
+            throw $exception;
+        }
 
         return redirect()->route($this->route.'.show', $record)->with('status', $this->title.' dibuat.');
     }
@@ -132,7 +149,7 @@ abstract class ResourceController extends Controller
         }
 
         $table = $query->getModel()->getTable();
-        $searchableColumns = collect(['code', 'sku', 'name', 'description'])
+        $searchableColumns = collect($this->searchableColumns ?: ['code', 'sku', 'name', 'description'])
             ->filter(fn (string $column): bool => Schema::hasColumn($table, $column))
             ->values();
 

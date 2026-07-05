@@ -35,9 +35,7 @@ return new class extends Migration
                 DB::table('document_sequences')->where('id', $oldSequence->id)->delete();
             }
 
-            $existingLastNumber = $this->existingLastNumber($code, $document['table']);
             $sequence = DB::table('document_sequences')->where('document_type', $code)->first();
-            $lastNumber = max((int) ($sequence->last_number ?? 0), $existingLastNumber);
 
             DB::table('document_sequences')->updateOrInsert(
                 ['document_type' => $code],
@@ -46,7 +44,7 @@ return new class extends Migration
                     'prefix' => $code,
                     'period_type' => 'monthly',
                     'current_period' => now()->format('Ym'),
-                    'last_number' => $lastNumber,
+                    'last_number' => (int) ($sequence->last_number ?? 0),
                     'padding' => 4,
                     'separator' => '/',
                     'is_active' => true,
@@ -60,24 +58,5 @@ return new class extends Migration
     public function down(): void
     {
         //
-    }
-
-    private function existingLastNumber(string $prefix, string $table): int
-    {
-        if (! Schema::hasTable($table)) {
-            return 0;
-        }
-
-        $numberPrefix = $prefix.'/'.now()->format('Y').'/'.now()->format('m').'/';
-
-        return DB::table($table)
-            ->where('number', 'like', $numberPrefix.'%')
-            ->pluck('number')
-            ->map(function (string $number): int {
-                $parts = explode('/', $number);
-
-                return (int) end($parts);
-            })
-            ->max() ?? 0;
     }
 };

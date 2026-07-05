@@ -2,13 +2,20 @@
 
 namespace Database\Seeders;
 
+use App\Models\Currency;
+use App\Models\PaymentTerm;
 use App\Models\Supplier;
+use App\Models\Tax;
 use Illuminate\Database\Seeder;
 
 class SupplierSeeder extends Seeder
 {
     public function run(): void
     {
+        $idr = Currency::where('code', 'IDR')->first();
+        $cash = PaymentTerm::where('code', 'CASH')->first();
+        $vat = Tax::whereIn('code', ['VAT11', 'VAT12'])->orderBy('code')->first();
+
         foreach ([
             [
                 'code' => 'SUP001',
@@ -118,10 +125,10 @@ class SupplierSeeder extends Seeder
                 'province' => $supplier['province'],
                 'country' => 'Indonesia',
                 'postal_code' => '60'.substr($supplier['code'], -3),
-                'default_currency_id' => null,
-                'payment_term_id' => null,
+                'default_currency_id' => $idr?->id,
+                'payment_term_id' => $cash?->id,
                 'lead_time_days' => 3,
-                'default_tax_id' => null,
+                'default_tax_id' => $vat?->id,
                 'ap_account_id' => null,
                 'blocked_purchase' => false,
                 'is_active' => true,

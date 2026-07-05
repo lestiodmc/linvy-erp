@@ -6,7 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\PurchaseRequest;
 use App\Models\UnitOfMeasure;
-use App\Services\DocumentNumberService;
+use App\Services\DocumentSequenceService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,19 +35,29 @@ class PurchaseRequestController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $record = DB::transaction(function () use ($request): PurchaseRequest {
-            $data = $this->validated($request);
-            $lines = $data['lines'];
-            unset($data['lines']);
-            $data['number'] = app(DocumentNumberService::class)->generate('PR');
-            $data['status'] = 'draft';
-            $data['requested_by'] = Auth::id();
+        try {
+            $record = DB::transaction(function () use ($request): PurchaseRequest {
+                $data = $this->validated($request);
+                $lines = $data['lines'];
+                unset($data['lines']);
+                $data['number'] = app(DocumentSequenceService::class)->generate('PURCHASE_REQUEST');
+                $data['status'] = 'draft';
+                $data['requested_by'] = Auth::id();
 
-            $record = PurchaseRequest::create($data);
-            $this->syncLines($record, $lines);
+                $record = PurchaseRequest::create($data);
+                $this->syncLines($record, $lines);
 
-            return $record;
-        });
+                return $record;
+            });
+        } catch (QueryException $exception) {
+            if ((string) $exception->getCode() === '23000') {
+                return back()
+                    ->withInput()
+                    ->withErrors(['number' => 'Nomor dokumen sudah digunakan. Silakan ulangi proses.']);
+            }
+
+            throw $exception;
+        }
 
         return redirect()->route('purchase-requests.show', $record)->with('status', 'Purchase request dibuat.');
     }

@@ -2,9 +2,9 @@
     $columnLabels = [
         'code' => 'Code',
         'name' => 'Name',
-        'customer_type' => 'Type',
-        'billing_city' => 'City',
-        'phone' => 'Phone',
+        'tax_type' => 'Type',
+        'rate' => 'Rate',
+        'is_inclusive' => 'Inclusive',
         'is_active' => 'Active',
     ];
 @endphp
