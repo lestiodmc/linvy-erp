@@ -25,6 +25,11 @@ class Receiving extends Model
         return $this->belongsTo(Supplier::class);
     }
 
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);

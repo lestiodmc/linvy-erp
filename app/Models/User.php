@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -52,6 +53,18 @@ class User extends Authenticatable
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function branches(): BelongsToMany
+    {
+        return $this->belongsToMany(Branch::class)->withTimestamps();
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        $permissions = $this->role?->permissions ?? [];
+
+        return $this->role?->code === 'super-admin' || in_array('*', $permissions, true);
     }
 
     public function canAccessModule(string $module): bool

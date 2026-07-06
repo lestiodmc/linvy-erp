@@ -26,7 +26,7 @@ class ReceivingSeeder extends Seeder
             }
         }
 
-        $warehouse = Warehouse::where('code', 'RM-WH')->firstOrFail();
+        $warehouse = Warehouse::where('code', 'SBY-RM-WH')->firstOrFail();
         $date = now()->startOfMonth()->addDays(12);
 
         $receivings = [
@@ -68,6 +68,8 @@ class ReceivingSeeder extends Seeder
 
             $record = Receiving::create([
                 'number' => $this->number('RCV', $receiving['idx']),
+                'company_id' => $po->company_id,
+                'branch_id' => $po->branch_id,
                 'purchase_order_id' => $po->id,
                 'supplier_id' => $po->supplier_id,
                 'warehouse_id' => $warehouse->id,

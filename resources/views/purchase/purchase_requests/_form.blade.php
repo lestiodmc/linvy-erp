@@ -23,9 +23,6 @@
 
                         if (isEmpty) {
                             row.querySelectorAll('input, select, textarea').forEach((input) => input.disabled = true);
-                        } else if (!unit.value) {
-                            const selectedItem = item.selectedOptions[0];
-                            unit.value = selectedItem?.dataset.unitId || '';
                         }
                     });
                 }
@@ -77,14 +74,20 @@
                                 @php $line = $lines[$i] ?? []; @endphp
                                 <tr x-show="{{ $i }} < rows" data-pr-line>
                                     <td class="px-3 py-3">
-                                        <select name="lines[{{ $i }}][item_id]" :disabled="{{ $i }} >= rows" data-pr-item @change="$el.closest('[data-pr-line]').querySelector('[data-pr-unit]').value = $el.selectedOptions[0]?.dataset.unitId || ''" class="w-56 rounded-lg border-slate-200 text-sm">
-                                            <option value="">Select item</option>
-                                            @foreach($items as $item)
-                                                <option value="{{ $item->id }}" data-unit-id="{{ $item->unit_of_measure_id }}" @selected((string)($line['item_id'] ?? '') === (string)$item->id)>{{ $item->sku }} - {{ $item->name }}</option>
-                                            @endforeach
-                                        </select>
+                                        <x-searchable-select
+                                            name="lines[{{ $i }}][item_id]"
+                                            :url="route('purchase.lookup.items')"
+                                            placeholder="Search item by SKU or name..."
+                                            :selected-id="$line['item_id'] ?? null"
+                                            :selected-text="$selectedItems[$line['item_id'] ?? null]['text'] ?? ''"
+                                            unit-target="[data-pr-unit]"
+                                            description-target="[data-pr-description]"
+                                            input-class="w-64"
+                                            x-bind:disabled="{{ $i }} >= rows"
+                                            data-pr-item
+                                        />
                                     </td>
-                                    <td class="px-3 py-3"><input name="lines[{{ $i }}][description]" :disabled="{{ $i }} >= rows" value="{{ $line['description'] ?? '' }}" class="w-64 rounded-lg border-slate-200 text-sm"></td>
+                                    <td class="px-3 py-3"><input name="lines[{{ $i }}][description]" :disabled="{{ $i }} >= rows" data-pr-description value="{{ $line['description'] ?? '' }}" class="w-64 rounded-lg border-slate-200 text-sm"></td>
                                     <td class="px-3 py-3"><input type="number" step="0.0001" name="lines[{{ $i }}][quantity]" :disabled="{{ $i }} >= rows" data-pr-quantity value="{{ $line['quantity'] ?? '' }}" class="w-28 rounded-lg border-slate-200 text-sm"></td>
                                     <td class="px-3 py-3">
                                         <select name="lines[{{ $i }}][unit_id]" :disabled="{{ $i }} >= rows" data-pr-unit class="w-36 rounded-lg border-slate-200 text-sm">

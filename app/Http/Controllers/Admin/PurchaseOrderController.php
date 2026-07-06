@@ -20,10 +20,39 @@ use Illuminate\View\View;
 
 class PurchaseOrderController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $filters = $this->indexFilters($request);
+        $branches = $this->accessibleBranches();
+        $branchIds = $branches->pluck('id');
+
+        $records = PurchaseOrder::with(['supplier', 'purchaseRequest', 'branch'])
+            ->when(! Auth::user()?->isSuperAdmin(), fn ($query) => $query->whereIn('branch_id', $branchIds))
+            ->when(filled($filters['keyword'] ?? null), function ($query) use ($filters): void {
+                $keyword = $filters['keyword'];
+
+                $query->where(function ($search) use ($keyword): void {
+                    $search->where('number', 'like', '%'.$keyword.'%')
+                        ->orWhereHas('supplier', fn ($supplier) => $supplier->where('name', 'like', '%'.$keyword.'%'))
+                        ->orWhereHas('purchaseRequest', fn ($purchaseRequest) => $purchaseRequest->where('number', 'like', '%'.$keyword.'%'));
+                });
+            })
+            ->when(filled($filters['date_from'] ?? null), fn ($query) => $query->whereDate('order_date', '>=', $filters['date_from']))
+            ->when(filled($filters['date_to'] ?? null), fn ($query) => $query->whereDate('order_date', '<=', $filters['date_to']))
+            ->when(filled($filters['status'] ?? null), fn ($query) => $query->where('status', $filters['status']))
+            ->when(filled($filters['branch_id'] ?? null), fn ($query) => $query->where('branch_id', $filters['branch_id']))
+            ->when(filled($filters['supplier_id'] ?? null), fn ($query) => $query->where('supplier_id', $filters['supplier_id']))
+            ->orderByDesc('order_date')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
         return view('purchase.purchase_orders.index', [
-            'records' => PurchaseOrder::with(['supplier', 'purchaseRequest'])->latest('id')->paginate(15),
+            'records' => $records,
+            'filters' => $filters,
+            'statuses' => ['draft', 'submitted', 'approved', 'partially_received', 'fully_received', 'closed', 'cancelled'],
+            'branches' => $branches,
+            'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
         ]);
     }
 
@@ -194,10 +223,55 @@ class PurchaseOrderController extends Controller
         return view('purchase.purchase_orders.'.($record->exists ? 'edit' : 'create'), [
             'record' => $record,
             'purchaseRequest' => $purchaseRequest ?: $record->purchaseRequest,
-            'items' => Item::with('unitOfMeasure')->where('is_active', true)->orderBy('name')->get(),
+            'selectedItems' => $this->selectedItemOptions($record),
             'units' => UnitOfMeasure::where('is_active', true)->orderBy('name')->get(),
-            'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
+            'selectedSupplier' => $this->selectedSupplierOption($record),
         ]);
+    }
+
+    private function selectedItemOptions(PurchaseOrder $record): array
+    {
+        $lines = session()->getOldInput('lines', $record->lines->toArray());
+        $ids = collect($lines)->pluck('item_id')->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return Item::with(['unitOfMeasure:id,code,name', 'purchaseUnit:id,code,name', 'baseUnit:id,code,name'])
+            ->whereIn('id', $ids)
+            ->get(['id', 'sku', 'name', 'unit_of_measure_id', 'base_unit_id', 'purchase_unit_id'])
+            ->mapWithKeys(function (Item $item): array {
+                $unit = $item->purchaseUnit ?: ($item->unitOfMeasure ?: $item->baseUnit);
+
+                return [
+                    $item->id => [
+                        'text' => trim(($item->sku ? $item->sku.' - ' : '').$item->name),
+                        'unit_id' => $unit?->id,
+                    ],
+                ];
+            })
+            ->all();
+    }
+
+    private function selectedSupplierOption(PurchaseOrder $record): array
+    {
+        $supplierId = session()->getOldInput('supplier_id', $record->supplier_id);
+
+        if (! $supplierId) {
+            return [];
+        }
+
+        $supplier = Supplier::find($supplierId);
+
+        if (! $supplier) {
+            return [];
+        }
+
+        return [
+            'id' => $supplier->id,
+            'text' => trim(($supplier->code ? $supplier->code.' - ' : '').$supplier->name),
+        ];
     }
 
     private function validated(Request $request): array
@@ -319,5 +393,31 @@ class PurchaseOrderController extends Controller
     private function currentBranch(): ?Branch
     {
         return Branch::where('is_active', true)->orderBy('id')->first();
+    }
+
+    private function indexFilters(Request $request): array
+    {
+        $filters = $request->only(['keyword', 'date_from', 'date_to', 'status', 'branch_id', 'supplier_id']);
+
+        if (! $request->has('date_from')) {
+            $filters['date_from'] = now()->startOfMonth()->toDateString();
+        }
+
+        if (! $request->has('date_to')) {
+            $filters['date_to'] = now()->toDateString();
+        }
+
+        return $filters;
+    }
+
+    private function accessibleBranches(): \Illuminate\Support\Collection
+    {
+        $query = Branch::where('is_active', true)->orderBy('name');
+
+        if (! Auth::user()?->isSuperAdmin()) {
+            $query->whereHas('users', fn ($branchQuery) => $branchQuery->whereKey(Auth::id()));
+        }
+
+        return $query->get();
     }
 }

@@ -20,6 +20,11 @@ class PurchaseRequest extends Model
         return $this->belongsTo(User::class, 'requested_by');
     }
 
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     public function lines(): HasMany
     {
         return $this->hasMany(PurchaseRequestLine::class);

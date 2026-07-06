@@ -67,15 +67,7 @@ class WarehouseSeeder extends Seeder
             }
         }
 
-        $surabaya = $branches['SBY'];
-        Warehouse::updateOrCreate(['code' => 'RM-WH'], [
-            'company_id' => $company->id,
-            'branch_id' => $surabaya->id,
-            'warehouse_type_id' => $warehouseTypes['RAW_MATERIAL']->id,
-            'name' => 'Raw Material Warehouse',
-            'type' => 'raw_material',
-            'address' => 'Surabaya facility',
-            'is_active' => true,
-        ]);
+        Warehouse::whereIn('code', ['RM-WH', 'PK-WH', 'PROD-WH', 'FG-WH', 'QC-WH', 'TRANSIT-WH', 'REJECT-WH'])
+            ->update(['is_active' => false]);
     }
 }

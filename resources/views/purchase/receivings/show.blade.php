@@ -25,6 +25,7 @@
                     <div><dt class="font-bold text-slate-500">Status</dt><dd><x-status-badge :status="$record->status" /></dd></div>
                     <div><dt class="font-bold text-slate-500">PO</dt><dd class="font-semibold text-slate-900">{{ $record->purchaseOrder?->number }}</dd></div>
                     <div><dt class="font-bold text-slate-500">Supplier</dt><dd class="font-semibold text-slate-900">{{ $record->supplier?->name }}</dd></div>
+                    <div><dt class="font-bold text-slate-500">Branch</dt><dd class="font-semibold text-slate-900">{{ $record->branch?->name ?: '-' }}</dd></div>
                     <div><dt class="font-bold text-slate-500">Received Date</dt><dd class="font-semibold text-slate-900">{{ $record->received_date?->format('Y-m-d') }}</dd></div>
                     <div><dt class="font-bold text-slate-500">Supplier Delivery No.</dt><dd class="text-slate-700">{{ $record->supplier_delivery_number ?: '-' }}</dd></div>
                     <div><dt class="font-bold text-slate-500">Notes</dt><dd class="text-slate-700">{{ $record->notes ?: '-' }}</dd></div>
@@ -39,7 +40,7 @@
                             @foreach($record->lines as $line)
                                 <tr>
                                     <td class="px-4 py-3"><div class="font-bold text-slate-900">{{ $line->item?->name }}</div><div class="text-xs text-slate-500">{{ $line->description }}</div></td>
-                                    <td class="px-4 py-3"><div class="font-semibold text-slate-900">{{ $line->warehouse?->name }}</div><div class="text-xs text-slate-500">{{ $line->warehouse?->branch?->name }}</div></td>
+                                    <td class="px-4 py-3"><div class="font-semibold text-slate-900">{{ $line->warehouse?->code }} - {{ $line->warehouse?->name }}</div><div class="text-xs text-slate-500">{{ $line->warehouse?->branch?->name }}</div></td>
                                     <td class="px-4 py-3 text-right">{{ number_format($line->ordered_quantity, 4) }} {{ $line->unit?->code }}</td>
                                     <td class="px-4 py-3 text-right">{{ number_format($line->previously_received_quantity, 4) }}</td>
                                     <td class="px-4 py-3 text-right font-semibold text-emerald-700">{{ number_format($line->received_quantity, 4) }}</td>

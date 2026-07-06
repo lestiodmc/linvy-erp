@@ -18,10 +18,32 @@ use Illuminate\View\View;
 
 class PurchaseRequestController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $filters = $this->indexFilters($request);
+
+        $records = PurchaseRequest::with(['requester', 'branch'])
+            ->when(filled($filters['keyword'] ?? null), function ($query) use ($filters): void {
+                $keyword = $filters['keyword'];
+
+                $query->where(function ($search) use ($keyword): void {
+                    $search->where('number', 'like', '%'.$keyword.'%')
+                        ->orWhere('department', 'like', '%'.$keyword.'%')
+                        ->orWhereHas('requester', fn ($user) => $user->where('name', 'like', '%'.$keyword.'%'));
+                });
+            })
+            ->when(filled($filters['date_from'] ?? null), fn ($query) => $query->whereDate('request_date', '>=', $filters['date_from']))
+            ->when(filled($filters['date_to'] ?? null), fn ($query) => $query->whereDate('request_date', '<=', $filters['date_to']))
+            ->when(filled($filters['status'] ?? null), fn ($query) => $query->where('status', $filters['status']))
+            ->orderByDesc('request_date')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
         return view('purchase.purchase_requests.index', [
-            'records' => PurchaseRequest::with(['requester'])->latest('id')->paginate(15),
+            'records' => $records,
+            'filters' => $filters,
+            'statuses' => ['draft', 'submitted', 'approved', 'rejected', 'closed', 'cancelled'],
         ]);
     }
 
@@ -153,9 +175,34 @@ class PurchaseRequestController extends Controller
     {
         return view('purchase.purchase_requests.'.($record->exists ? 'edit' : 'create'), [
             'record' => $record,
-            'items' => Item::with('unitOfMeasure')->where('is_active', true)->orderBy('name')->get(),
+            'selectedItems' => $this->selectedItemOptions($record),
             'units' => UnitOfMeasure::where('is_active', true)->orderBy('name')->get(),
         ]);
+    }
+
+    private function selectedItemOptions(PurchaseRequest $record): array
+    {
+        $lines = session()->getOldInput('lines', $record->lines->toArray());
+        $ids = collect($lines)->pluck('item_id')->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return Item::with(['unitOfMeasure:id,code,name', 'purchaseUnit:id,code,name', 'baseUnit:id,code,name'])
+            ->whereIn('id', $ids)
+            ->get(['id', 'sku', 'name', 'unit_of_measure_id', 'base_unit_id', 'purchase_unit_id'])
+            ->mapWithKeys(function (Item $item): array {
+                $unit = $item->purchaseUnit ?: ($item->unitOfMeasure ?: $item->baseUnit);
+
+                return [
+                    $item->id => [
+                        'text' => trim(($item->sku ? $item->sku.' - ' : '').$item->name),
+                        'unit_id' => $unit?->id,
+                    ],
+                ];
+            })
+            ->all();
     }
 
     private function validated(Request $request): array
@@ -234,5 +281,20 @@ class PurchaseRequestController extends Controller
     private function currentBranch(): ?Branch
     {
         return Branch::where('is_active', true)->orderBy('id')->first();
+    }
+
+    private function indexFilters(Request $request): array
+    {
+        $filters = $request->only(['keyword', 'date_from', 'date_to', 'status']);
+
+        if (! $request->has('date_from')) {
+            $filters['date_from'] = now()->startOfMonth()->toDateString();
+        }
+
+        if (! $request->has('date_to')) {
+            $filters['date_to'] = now()->toDateString();
+        }
+
+        return $filters;
     }
 }

@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\ItemController;
 use App\Http\Controllers\Admin\ModuleSettingController;
 use App\Http\Controllers\Admin\PaymentTermController;
 use App\Http\Controllers\Admin\PurchaseRequestController;
+use App\Http\Controllers\Admin\PurchaseLookupController;
 use App\Http\Controllers\Admin\ProductionController;
 use App\Http\Controllers\Admin\PurchaseOrderController;
 use App\Http\Controllers\Admin\ReceivingController;
@@ -61,6 +62,10 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('module:purchase')->group(function () {
+        Route::get('master-data/items/search', [PurchaseLookupController::class, 'items'])->name('purchase.lookup.items');
+        Route::get('master-data/suppliers/search', [PurchaseLookupController::class, 'suppliers'])->name('purchase.lookup.suppliers');
+        Route::get('purchase-orders/search', [PurchaseLookupController::class, 'purchaseOrders'])->name('purchase.lookup.purchase-orders');
+
         Route::post('purchase-requests/{record}/submit', [PurchaseRequestController::class, 'submit'])->name('purchase-requests.submit');
         Route::post('purchase-requests/{record}/approve', [PurchaseRequestController::class, 'approve'])->name('purchase-requests.approve');
         Route::post('purchase-requests/{record}/reject', [PurchaseRequestController::class, 'reject'])->name('purchase-requests.reject');

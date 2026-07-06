@@ -23,9 +23,6 @@
 
                         if (isEmpty) {
                             row.querySelectorAll('input, select, textarea').forEach((input) => input.disabled = true);
-                        } else if (!unit.value) {
-                            const selectedItem = item.selectedOptions[0];
-                            unit.value = selectedItem?.dataset.unitId || '';
                         }
                     });
                 }
@@ -43,12 +40,15 @@
             <div class="grid gap-5 border-b border-slate-100 p-6 md:grid-cols-4">
                 <div>
                     <label class="text-sm font-bold text-slate-600">Supplier</label>
-                    <select name="supplier_id" class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                        <option value="">Select supplier</option>
-                        @foreach($suppliers as $supplier)
-                            <option value="{{ $supplier->id }}" @selected((string)old('supplier_id', $record->supplier_id) === (string)$supplier->id)>{{ $supplier->name }}</option>
-                        @endforeach
-                    </select>
+                    <div class="mt-1">
+                        <x-searchable-select
+                            name="supplier_id"
+                            :url="route('purchase.lookup.suppliers')"
+                            placeholder="Search supplier by code or name..."
+                            :selected-id="$selectedSupplier['id'] ?? null"
+                            :selected-text="$selectedSupplier['text'] ?? ''"
+                        />
+                    </div>
                 </div>
                 <div>
                     <label class="text-sm font-bold text-slate-600">Order Date</label>
@@ -83,14 +83,20 @@
                                 <tr x-show="{{ $i }} < rows" data-po-line>
                                     <td class="px-3 py-3">
                                         <input type="hidden" name="lines[{{ $i }}][purchase_request_line_id]" :disabled="{{ $i }} >= rows" value="{{ $line['purchase_request_line_id'] ?? '' }}">
-                                        <select name="lines[{{ $i }}][item_id]" :disabled="{{ $i }} >= rows" data-po-item @change="$el.closest('[data-po-line]').querySelector('[data-po-unit]').value = $el.selectedOptions[0]?.dataset.unitId || ''" class="w-56 rounded-lg border-slate-200 text-sm">
-                                            <option value="">Select item</option>
-                                            @foreach($items as $item)
-                                                <option value="{{ $item->id }}" data-unit-id="{{ $item->unit_of_measure_id }}" @selected((string)($line['item_id'] ?? '') === (string)$item->id)>{{ $item->sku }} - {{ $item->name }}</option>
-                                            @endforeach
-                                        </select>
+                                        <x-searchable-select
+                                            name="lines[{{ $i }}][item_id]"
+                                            :url="route('purchase.lookup.items')"
+                                            placeholder="Search item by SKU or name..."
+                                            :selected-id="$line['item_id'] ?? null"
+                                            :selected-text="$selectedItems[$line['item_id'] ?? null]['text'] ?? ''"
+                                            unit-target="[data-po-unit]"
+                                            description-target="[data-po-description]"
+                                            input-class="w-64"
+                                            x-bind:disabled="{{ $i }} >= rows"
+                                            data-po-item
+                                        />
                                     </td>
-                                    <td class="px-3 py-3"><input name="lines[{{ $i }}][description]" :disabled="{{ $i }} >= rows" value="{{ $line['description'] ?? '' }}" class="w-64 rounded-lg border-slate-200 text-sm"></td>
+                                    <td class="px-3 py-3"><input name="lines[{{ $i }}][description]" :disabled="{{ $i }} >= rows" data-po-description value="{{ $line['description'] ?? '' }}" class="w-64 rounded-lg border-slate-200 text-sm"></td>
                                     <td class="px-3 py-3"><input data-po-qty type="number" step="0.0001" name="lines[{{ $i }}][quantity]" :disabled="{{ $i }} >= rows" value="{{ $line['quantity'] ?? '' }}" class="w-28 rounded-lg border-slate-200 text-sm"></td>
                                     <td class="px-3 py-3">
                                         <select name="lines[{{ $i }}][unit_id]" :disabled="{{ $i }} >= rows" data-po-unit class="w-32 rounded-lg border-slate-200 text-sm">
