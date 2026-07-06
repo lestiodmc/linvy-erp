@@ -27,7 +27,9 @@ class PurchaseOrderController extends Controller
         $branchIds = $branches->pluck('id');
 
         $records = PurchaseOrder::with(['supplier', 'purchaseRequest', 'branch'])
-            ->when(! Auth::user()?->isSuperAdmin(), fn ($query) => $query->whereIn('branch_id', $branchIds))
+            ->when(! Auth::user()?->isSuperAdmin(), fn ($query) => $query->where(function ($branchQuery) use ($branchIds): void {
+                $branchQuery->whereNull('branch_id')->orWhereIn('branch_id', $branchIds);
+            }))
             ->when(filled($filters['keyword'] ?? null), function ($query) use ($filters): void {
                 $keyword = $filters['keyword'];
 

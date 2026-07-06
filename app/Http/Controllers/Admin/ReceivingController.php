@@ -7,11 +7,10 @@ use App\Models\Branch;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\Receiving;
-use App\Models\StockBalance;
-use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\DocumentSequenceService;
+use App\Services\Inventory\InventoryPostingService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,7 +29,9 @@ class ReceivingController extends Controller
 
         return view('purchase.receivings.index', [
             'records' => Receiving::with(['purchaseOrder', 'supplier', 'branch', 'lines.warehouse.branch'])
-                ->when(! Auth::user()?->isSuperAdmin(), fn ($query) => $query->whereIn('branch_id', $branchIds))
+                ->when(! Auth::user()?->isSuperAdmin(), fn ($query) => $query->where(function ($branchQuery) use ($branchIds): void {
+                    $branchQuery->whereNull('branch_id')->orWhereIn('branch_id', $branchIds);
+                }))
                 ->when(filled($filters['keyword'] ?? null), function ($query) use ($filters): void {
                     $keyword = $filters['keyword'];
 
@@ -170,9 +171,9 @@ class ReceivingController extends Controller
         return redirect()->route('receivings.index')->with('status', 'Receiving dihapus.');
     }
 
-    public function post(Receiving $record): RedirectResponse
+    public function post(Receiving $record, InventoryPostingService $inventoryPostingService): RedirectResponse
     {
-        DB::transaction(function () use ($record): void {
+        DB::transaction(function () use ($record, $inventoryPostingService): void {
             $record = Receiving::whereKey($record->id)->lockForUpdate()->firstOrFail();
             abort_if($record->status !== 'draft', 422, 'Only draft receiving can be posted.');
             $this->ensureBranchAccess((int) $record->branch_id);
@@ -207,29 +208,9 @@ class ReceivingController extends Controller
                     'received_quantity' => $newReceivedQuantity,
                     'remaining_quantity' => max(0, (float) $poLine->quantity - $newReceivedQuantity),
                 ]);
-
-                if ((bool) ($line->item?->track_inventory ?? true)) {
-                    StockMovement::create([
-                        'item_id' => $line->item_id,
-                        'warehouse_id' => $line->warehouse_id,
-                        'movement_type' => 'PURCHASE_RECEIVE',
-                        'quantity_in' => $line->received_quantity,
-                        'quantity_out' => 0,
-                        'unit_cost' => $line->unit_cost,
-                        'total_cost' => (float) $line->received_quantity * (float) $line->unit_cost,
-                        'reference_type' => Receiving::class,
-                        'reference_id' => $record->id,
-                        'reference_number' => $record->number,
-                        'movement_date' => $record->received_date,
-                        'notes' => $line->notes,
-                        'created_by' => Auth::id(),
-                    ]);
-
-                    $this->updateStockBalance($line->item_id, $line->warehouse_id, (float) $line->received_quantity, (float) $line->unit_cost, $record->received_date);
-                }
             }
 
-            $record->update(['status' => 'posted']);
+            $inventoryPostingService->postReceive($record);
             $record->approvalLogs()->create([
                 'action' => 'post',
                 'user_id' => Auth::id(),
@@ -421,39 +402,6 @@ class ReceivingController extends Controller
     private function ensureReceivable(PurchaseOrder $purchaseOrder): void
     {
         abort_if(! in_array($purchaseOrder->status, ['approved', 'partially_received'], true), 422, 'PO can only be received when approved or partially received.');
-    }
-
-    private function updateStockBalance(int $itemId, int $warehouseId, float $quantity, float $unitCost, mixed $movementDate): void
-    {
-        $balance = StockBalance::where('item_id', $itemId)
-            ->where('warehouse_id', $warehouseId)
-            ->lockForUpdate()
-            ->first();
-
-        if (! $balance) {
-            StockBalance::create([
-                'item_id' => $itemId,
-                'warehouse_id' => $warehouseId,
-                'quantity_on_hand' => $quantity,
-                'quantity_reserved' => 0,
-                'average_cost' => $unitCost,
-                'last_movement_at' => $movementDate,
-            ]);
-
-            return;
-        }
-
-        $oldQuantity = (float) $balance->quantity_on_hand;
-        $newQuantity = $oldQuantity + $quantity;
-        $averageCost = $newQuantity > 0
-            ? (($oldQuantity * (float) $balance->average_cost) + ($quantity * $unitCost)) / $newQuantity
-            : $unitCost;
-
-        $balance->update([
-            'quantity_on_hand' => $newQuantity,
-            'average_cost' => $averageCost,
-            'last_movement_at' => $movementDate,
-        ]);
     }
 
     private function accessibleBranches(): \Illuminate\Support\Collection
