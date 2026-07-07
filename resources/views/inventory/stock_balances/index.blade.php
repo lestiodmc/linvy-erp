@@ -2,7 +2,7 @@
     <x-slot name="header">
         <x-ui.page-header
             title="Stock Balances"
-            subtitle="Current inventory by item, branch, and warehouse."
+            subtitle="Stock Balance shows total stock per item and warehouse. Use Batch Detail to view batch-level stock."
         />
     </x-slot>
 
@@ -38,7 +38,7 @@
             <x-ui.search-input :value="$filters['keyword'] ?? ''" />
             <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies" all-label="All companies" />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches" all-label="All branches" />
-            <x-ui.select-filter name="warehouse_id" label="Warehouse" :value="$filters['warehouse_id'] ?? ''" :options="$warehouses" all-label="All warehouses" />
+            <x-ui.warehouse-filter :warehouses="$warehouses" :value="$filters['warehouse_id'] ?? ''" />
             <x-ui.select-filter name="item_category_id" label="Item Category" :value="$filters['item_category_id'] ?? ''" :options="$itemCategories" all-label="All categories" />
             <x-ui.select-filter name="stock_status" label="Stock Status" :value="$filters['stock_status'] ?? ''" :options="$stockStatuses" all-label="All Stock" />
             <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Apply</button>
@@ -85,6 +85,7 @@
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $formatDate($record->last_movement_at) }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-right">
                         <a href="{{ route('stock-balances.show', $record) }}" class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Open</a>
+                        <a href="{{ route('stock-balances.batches', $record) }}" class="ml-1 inline-flex h-7 items-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">Batch Detail</a>
                     </td>
                 </tr>
             @empty

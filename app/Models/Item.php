@@ -8,6 +8,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Item extends Model
 {
+    public const COST_METHOD_STANDARD = 'standard';
+    public const COST_METHOD_AVERAGE = 'average';
+    public const COST_METHOD_FIFO = 'fifo';
+
+    public const COST_METHODS = [
+        self::COST_METHOD_STANDARD,
+        self::COST_METHOD_AVERAGE,
+        self::COST_METHOD_FIFO,
+    ];
+
     protected $fillable = [
         'sku',
         'name',

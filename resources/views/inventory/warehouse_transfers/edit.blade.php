@@ -1,1 +1,4 @@
-@include('shared.resources.edit')
+@include('inventory.warehouse_transfers._form', [
+    'action' => route('warehouse-transfers.update', $record),
+    'method' => 'PUT',
+])

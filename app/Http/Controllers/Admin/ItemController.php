@@ -10,6 +10,7 @@ use App\Models\WarehouseType;
 use App\Support\ModuleManager;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ItemController extends ResourceController
 {
@@ -70,7 +71,9 @@ class ItemController extends ResourceController
         $data['purchase_price'] = $data['purchase_price'] ?? 0;
         $data['sales_price'] = $data['sales_price'] ?? 0;
         $data['standard_cost'] = $data['standard_cost'] ?? $data['purchase_price'];
-        $data['cost_method'] = $data['cost_method'] ?? 'standard';
+        $data['cost_method'] = $data['cost_method'] ?? Item::COST_METHOD_STANDARD;
+
+        $this->enforceInventoryTrackingRules($data);
 
         // Keep legacy columns populated for backward compatibility.
         $data['minimum_order_qty'] = $data['minimum_order_qty'] ?? 0;
@@ -120,6 +123,40 @@ class ItemController extends ResourceController
         };
     }
 
+    private function enforceInventoryTrackingRules(array &$data): void
+    {
+        $data['track_inventory'] = (bool) ($data['track_inventory'] ?? false);
+        $data['allow_negative_stock'] = (bool) ($data['allow_negative_stock'] ?? false);
+        $data['is_batch_tracked'] = (bool) ($data['is_batch_tracked'] ?? false);
+        $data['is_serial_tracked'] = (bool) ($data['is_serial_tracked'] ?? false);
+        $data['has_expiry_date'] = (bool) ($data['has_expiry_date'] ?? false);
+
+        if (($data['item_type'] ?? null) !== 'INVENTORY') {
+            $data['track_inventory'] = false;
+        }
+
+        if (! $data['track_inventory']) {
+            $data['allow_negative_stock'] = false;
+            $data['is_batch_tracked'] = false;
+            $data['is_serial_tracked'] = false;
+            $data['has_expiry_date'] = false;
+
+            return;
+        }
+
+        if ($data['is_batch_tracked'] && $data['is_serial_tracked']) {
+            throw ValidationException::withMessages([
+                'is_serial_tracked' => 'Batch tracked and serial tracked cannot both be enabled.',
+            ]);
+        }
+
+        if ($data['has_expiry_date'] && ! $data['is_batch_tracked']) {
+            throw ValidationException::withMessages([
+                'has_expiry_date' => 'Expiry date tracking requires batch tracking.',
+            ]);
+        }
+    }
+
     private function accountFields(): array
     {
         return [
@@ -156,7 +193,7 @@ class ItemController extends ResourceController
             'has_expiry_date' => ['label' => 'Has Expiry Date', 'type' => 'checkbox'],
             'purchase_price' => ['label' => 'Purchase Price', 'type' => 'number', 'step' => '0.01'],
             'sales_price' => ['label' => 'Sales Price', 'type' => 'number', 'step' => '0.01'],
-            'cost_method' => ['label' => 'Cost Method', 'type' => 'select', 'options' => ['standard' => 'Standard', 'average' => 'Average', 'fifo' => 'FIFO'], 'default' => 'standard'],
+            'cost_method' => ['label' => 'Cost Method', 'type' => 'select', 'options' => array_combine(Item::COST_METHODS, ['Standard', 'Average', 'FIFO']), 'default' => Item::COST_METHOD_STANDARD],
             'standard_cost' => ['label' => 'Standard Cost', 'type' => 'number', 'step' => '0.0001'],
             'is_active' => ['label' => 'Active', 'type' => 'checkbox'],
         ];

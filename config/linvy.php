@@ -52,8 +52,9 @@ return [
         'inventory' => [
             'label' => 'Inventory',
             'items' => [
-                ['label' => 'Stock Balances', 'route' => 'stock-balances.index', 'routes' => ['stock-balances.*']],
                 ['label' => 'Stock Movements', 'route' => 'stock-movements.index', 'routes' => ['stock-movements.*']],
+                ['label' => 'Stock Balances', 'route' => 'stock-balances.index', 'routes' => ['stock-balances.*']],
+                ['label' => 'Item Ledger', 'route' => 'item-ledger.index', 'routes' => ['item-ledger.*']],
                 ['label' => 'Warehouse Transfers', 'route' => 'warehouse-transfers.index', 'routes' => ['warehouse-transfers.*']],
                 ['label' => 'Stock Adjustments', 'route' => 'stock-adjustments.index', 'routes' => ['stock-adjustments.*']],
             ],

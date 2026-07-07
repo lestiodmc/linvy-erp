@@ -3,6 +3,7 @@
 namespace App\Services\Inventory;
 
 use App\Models\Inventory\StockBalance;
+use App\Models\Inventory\StockBatchBalance;
 use App\Models\Inventory\StockMovement;
 use App\Models\Item;
 use App\Models\Receiving;
@@ -20,7 +21,7 @@ class InventoryPostingService
         DB::transaction(function () use ($receive): void {
             /** @var Receiving $receive */
             $receive = Receiving::query()
-                ->with(['lines.item', 'lines.warehouse', 'lines.unit'])
+                ->with(['lines.item', 'lines.warehouse', 'lines.unit', 'lines.purchaseOrderLine'])
                 ->lockForUpdate()
                 ->findOrFail($receive->getKey());
 
@@ -44,6 +45,7 @@ class InventoryPostingService
                 $qty = (float) $line->received_quantity;
                 $baseQty = $this->baseQuantity($qty, $line->unit_id, $item);
                 $unitCost = (float) ($line->unit_cost ?? $line->purchaseOrderLine?->unit_price ?? 0);
+                $this->validateReceivingLineTracking($line, $item, $baseQty);
 
                 $movementData = [
                     'company_id' => $receive->company_id,
@@ -61,6 +63,8 @@ class InventoryPostingService
                     'base_qty' => $baseQty,
                     'unit_cost' => $unitCost,
                     'total_cost' => $baseQty * $unitCost,
+                    'batch_no' => (bool) $item->is_batch_tracked && ! (bool) $item->is_serial_tracked ? $line->batch_no : null,
+                    'expiry_date' => (bool) $item->has_expiry_date && ! (bool) $item->is_serial_tracked ? $line->expiry_date : null,
                     'reference_type' => $receive::class,
                     'reference_id' => $receive->id,
                     'remarks' => $line->notes,
@@ -68,20 +72,35 @@ class InventoryPostingService
                     'updated_by' => Auth::id(),
                 ];
 
-                $this->validateStock($movementData);
+                if ((bool) $item->is_serial_tracked) {
+                    foreach ($this->serialNumbers($line->serial_numbers) as $serialNumber) {
+                        $serialMovementData = $movementData + ['serial_no' => $serialNumber];
+                        $serialMovementData['batch_no'] = null;
+                        $serialMovementData['expiry_date'] = null;
+                        $serialMovementData['qty'] = 1;
+                        $serialMovementData['base_qty'] = 1;
+                        $serialMovementData['total_cost'] = $unitCost;
+
+                        $this->createMovement($serialMovementData);
+                        $this->updateStockBalance($serialMovementData);
+                    }
+
+                    continue;
+                }
+
                 $this->createMovement($movementData);
                 $this->updateStockBalance($movementData);
             }
 
             if (array_key_exists('status', $receive->getAttributes())) {
-                $receive->update(['status' => 'posted']);
+                $receive->update(['status' => Receiving::STATUS_POSTED]);
             }
         });
     }
 
     public function createMovement(array $data): StockMovement
     {
-        $this->validateMovementPayload($data);
+        $this->validateStock($data);
 
         $baseQty = (float) $data['base_qty'];
 
@@ -96,7 +115,7 @@ class InventoryPostingService
 
     public function updateStockBalance(array $data): StockBalance
     {
-        $this->validateStock($data);
+        $this->validateStock($data, false);
 
         return DB::transaction(function () use ($data): StockBalance {
             $balance = StockBalance::query()
@@ -176,17 +195,103 @@ class InventoryPostingService
 
             $balance->save();
 
+            $item = Item::find($data['item_id']);
+            if ($item && ((bool) $item->is_batch_tracked || (bool) $item->has_expiry_date)) {
+                $this->updateStockBatchBalance($data);
+            }
+
             return $balance;
         });
     }
 
-    public function validateStock(array $data): void
+    private function updateStockBatchBalance(array $data): StockBatchBalance
+    {
+        $batchNo = filled($data['batch_no'] ?? null) ? $data['batch_no'] : 'NO_BATCH';
+
+        if (blank($batchNo)) {
+            throw new InvalidArgumentException('Batch number is required for batch tracked stock balance.');
+        }
+
+        $batchBalance = StockBatchBalance::query()
+            ->where('company_id', $data['company_id'])
+            ->where('branch_id', $data['branch_id'])
+            ->where('warehouse_id', $data['warehouse_id'])
+            ->where('item_id', $data['item_id'])
+            ->where('batch_no', $batchNo)
+            ->where(function ($query) use ($data): void {
+                filled($data['expiry_date'] ?? null)
+                    ? $query->whereDate('expiry_date', $data['expiry_date'])
+                    : $query->whereNull('expiry_date');
+            })
+            ->lockForUpdate()
+            ->first();
+
+        if (! $batchBalance) {
+            $batchBalance = new StockBatchBalance([
+                'company_id' => $data['company_id'],
+                'branch_id' => $data['branch_id'],
+                'warehouse_id' => $data['warehouse_id'],
+                'item_id' => $data['item_id'],
+                'batch_no' => $batchNo,
+                'expiry_date' => $data['expiry_date'] ?? null,
+                'qty_on_hand' => 0,
+                'qty_reserved' => 0,
+                'qty_available' => 0,
+            ]);
+        }
+
+        $oldQty = (float) ($batchBalance->qty_on_hand ?? 0);
+        $movementQty = (float) $data['base_qty'];
+        $newQty = $data['movement_type'] === StockMovement::MOVEMENT_IN
+            ? $oldQty + $movementQty
+            : $oldQty - $movementQty;
+        $reservedQty = (float) ($batchBalance->qty_reserved ?? 0);
+
+        $batchBalance->fill([
+            'qty_on_hand' => $newQty,
+            'qty_reserved' => $reservedQty,
+            'qty_available' => $newQty - $reservedQty,
+        ]);
+        $batchBalance->save();
+
+        return $batchBalance;
+    }
+
+    public function validateStock(array $data, bool $enforceSerialUniqueness = true): void
     {
         $this->validateMovementPayload($data);
 
         $item = Item::find($data['item_id']);
         if (! $item) {
             throw new InvalidArgumentException('Item is required.');
+        }
+
+        if (! (bool) $item->track_inventory) {
+            throw new InvalidArgumentException('Non inventory items cannot create stock movement.');
+        }
+
+        if ((bool) $item->is_batch_tracked && blank($data['batch_no'] ?? null)) {
+            throw new InvalidArgumentException('Batch number is required for batch tracked item '.$item->sku.'.');
+        }
+
+        if ((bool) $item->has_expiry_date && blank($data['expiry_date'] ?? null)) {
+            throw new InvalidArgumentException('Expiry date is required for expiry tracked item '.$item->sku.'.');
+        }
+
+        if ((bool) $item->is_serial_tracked && blank($data['serial_no'] ?? null)) {
+            throw new InvalidArgumentException('Serial number is required for serial tracked item '.$item->sku.'.');
+        }
+
+        if (
+            (bool) $item->is_serial_tracked
+            && $enforceSerialUniqueness
+            && ($data['movement_type'] ?? null) === StockMovement::MOVEMENT_IN
+            && StockMovement::query()
+                ->where('item_id', $item->id)
+                ->where('serial_no', $data['serial_no'])
+                ->exists()
+        ) {
+            throw new InvalidArgumentException('Serial number already exists: '.$data['serial_no'].'.');
         }
 
         $warehouse = Warehouse::find($data['warehouse_id']);
@@ -208,6 +313,38 @@ class InventoryPostingService
 
             if ($currentQty < (float) $data['base_qty']) {
                 throw new RuntimeException('Insufficient stock.');
+            }
+
+            if ((bool) $item->is_batch_tracked || (bool) $item->has_expiry_date) {
+                $batchNo = filled($data['batch_no'] ?? null) ? $data['batch_no'] : 'NO_BATCH';
+                if ($batchNo === 'NO_BATCH' && blank($data['expiry_date'] ?? null)) {
+                    $knownBatchQty = (float) StockBatchBalance::query()
+                        ->where('company_id', $data['company_id'])
+                        ->where('branch_id', $data['branch_id'])
+                        ->where('warehouse_id', $data['warehouse_id'])
+                        ->where('item_id', $data['item_id'])
+                        ->sum('qty_on_hand');
+                    $batchQty = max(0, $currentQty - $knownBatchQty);
+                } else {
+                    $batchBalance = StockBatchBalance::query()
+                        ->where('company_id', $data['company_id'])
+                        ->where('branch_id', $data['branch_id'])
+                        ->where('warehouse_id', $data['warehouse_id'])
+                        ->where('item_id', $data['item_id'])
+                        ->where('batch_no', $batchNo)
+                        ->where(function ($query) use ($data): void {
+                            filled($data['expiry_date'] ?? null)
+                                ? $query->whereDate('expiry_date', $data['expiry_date'])
+                                : $query->whereNull('expiry_date');
+                        })
+                        ->first();
+
+                    $batchQty = (float) ($batchBalance?->qty_on_hand ?? 0);
+                }
+
+                if ($batchQty < (float) $data['base_qty']) {
+                    throw new RuntimeException('Insufficient batch stock.');
+                }
             }
         }
     }
@@ -233,6 +370,58 @@ class InventoryPostingService
         if ((float) ($data['qty'] ?? 0) <= 0 || (float) ($data['base_qty'] ?? 0) <= 0) {
             throw new InvalidArgumentException('Quantity must be greater than zero.');
         }
+    }
+
+    private function validateReceivingLineTracking(Model $line, Item $item, float $baseQty): void
+    {
+        if (! (bool) $item->track_inventory) {
+            return;
+        }
+
+        if ((bool) $item->is_batch_tracked && blank($line->batch_no)) {
+            throw new InvalidArgumentException('Batch number is required for batch tracked item '.$item->sku.'.');
+        }
+
+        if ((bool) $item->has_expiry_date && blank($line->expiry_date)) {
+            throw new InvalidArgumentException('Expiry date is required for expiry tracked item '.$item->sku.'.');
+        }
+
+        if (! (bool) $item->is_serial_tracked) {
+            return;
+        }
+
+        $serialNumbers = $this->serialNumbers($line->serial_numbers);
+
+        if ($serialNumbers === []) {
+            throw new InvalidArgumentException('Serial numbers are required for serial tracked item '.$item->sku.'.');
+        }
+
+        if (count($serialNumbers) !== count(array_unique($serialNumbers))) {
+            throw new InvalidArgumentException('Serial numbers must be unique for item '.$item->sku.'.');
+        }
+
+        if (abs($baseQty - count($serialNumbers)) > 0.000001) {
+            throw new InvalidArgumentException('Receiving quantity must match serial number count for item '.$item->sku.'.');
+        }
+
+        $usedSerialNumbers = StockMovement::query()
+            ->where('item_id', $item->id)
+            ->whereIn('serial_no', $serialNumbers)
+            ->pluck('serial_no')
+            ->all();
+
+        if ($usedSerialNumbers !== []) {
+            throw new InvalidArgumentException('Serial number already exists: '.implode(', ', $usedSerialNumbers).'.');
+        }
+    }
+
+    private function serialNumbers(?string $serialNumbers): array
+    {
+        return collect(preg_split('/[\r\n,]+/', (string) $serialNumbers))
+            ->map(fn (string $serialNumber): string => trim($serialNumber))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function baseQuantity(float $qty, ?int $uomId, ?Item $item): float

@@ -43,7 +43,7 @@ class PurchaseRequestController extends Controller
         return view('purchase.purchase_requests.index', [
             'records' => $records,
             'filters' => $filters,
-            'statuses' => ['draft', 'submitted', 'approved', 'rejected', 'closed', 'cancelled'],
+            'statuses' => PurchaseRequest::STATUSES,
         ]);
     }
 
@@ -52,7 +52,7 @@ class PurchaseRequestController extends Controller
         return $this->formView(new PurchaseRequest([
             'request_date' => now()->toDateString(),
             'requested_by' => Auth::id(),
-            'status' => 'draft',
+            'status' => PurchaseRequest::STATUS_DRAFT,
         ]));
     }
 
@@ -67,7 +67,7 @@ class PurchaseRequestController extends Controller
                 $data['company_id'] = $branch?->company_id;
                 $data['branch_id'] = $branch?->id;
                 $data['number'] = app(DocumentSequenceService::class)->generate('PURCHASE_REQUEST', $data['company_id'], $data['branch_id']);
-                $data['status'] = 'draft';
+                $data['status'] = PurchaseRequest::STATUS_DRAFT;
                 $data['requested_by'] = Auth::id();
 
                 $record = PurchaseRequest::create($data);
@@ -97,14 +97,14 @@ class PurchaseRequestController extends Controller
 
     public function edit(PurchaseRequest $record): View
     {
-        abort_if($record->status !== 'draft', 422, 'Only draft purchase requests can be edited.');
+        abort_if($record->status !== PurchaseRequest::STATUS_DRAFT, 422, 'Only draft purchase requests can be edited.');
 
         return $this->formView($record->load('lines'));
     }
 
     public function update(Request $request, PurchaseRequest $record): RedirectResponse
     {
-        abort_if($record->status !== 'draft', 422, 'Only draft purchase requests can be edited.');
+        abort_if($record->status !== PurchaseRequest::STATUS_DRAFT, 422, 'Only draft purchase requests can be edited.');
 
         DB::transaction(function () use ($request, $record): void {
             $data = $this->validated($request);
@@ -120,7 +120,7 @@ class PurchaseRequestController extends Controller
 
     public function destroy(PurchaseRequest $record): RedirectResponse
     {
-        abort_if($record->status !== 'draft', 422, 'Only draft purchase requests can be deleted.');
+        abort_if($record->status !== PurchaseRequest::STATUS_DRAFT, 422, 'Only draft purchase requests can be deleted.');
         $record->delete();
 
         return redirect()->route('purchase-requests.index')->with('status', 'Purchase request dihapus.');
@@ -128,45 +128,45 @@ class PurchaseRequestController extends Controller
 
     public function submit(PurchaseRequest $record): RedirectResponse
     {
-        abort_if($record->status !== 'draft', 422, 'Only draft purchase requests can be submitted.');
+        abort_if($record->status !== PurchaseRequest::STATUS_DRAFT, 422, 'Only draft purchase requests can be submitted.');
 
-        $this->setStatus($record, 'submitted', 'submit');
+        $this->setStatus($record, PurchaseRequest::STATUS_SUBMITTED, 'submit');
 
         return back()->with('status', 'Purchase request submitted.');
     }
 
     public function approve(PurchaseRequest $record): RedirectResponse
     {
-        abort_if($record->status !== 'submitted', 422, 'Only submitted purchase requests can be approved.');
+        abort_if($record->status !== PurchaseRequest::STATUS_SUBMITTED, 422, 'Only submitted purchase requests can be approved.');
 
-        $this->setStatus($record, 'approved', 'approve');
+        $this->setStatus($record, PurchaseRequest::STATUS_APPROVED, 'approve');
 
         return back()->with('status', 'Purchase request approved.');
     }
 
     public function reject(PurchaseRequest $record): RedirectResponse
     {
-        abort_if($record->status !== 'submitted', 422, 'Only submitted purchase requests can be rejected.');
+        abort_if($record->status !== PurchaseRequest::STATUS_SUBMITTED, 422, 'Only submitted purchase requests can be rejected.');
 
-        $this->setStatus($record, 'rejected', 'reject');
+        $this->setStatus($record, PurchaseRequest::STATUS_REJECTED, 'reject');
 
         return back()->with('status', 'Purchase request rejected.');
     }
 
     public function cancel(PurchaseRequest $record): RedirectResponse
     {
-        abort_if(! in_array($record->status, ['draft', 'submitted', 'approved'], true), 422, 'Purchase request cannot be cancelled.');
+        abort_if(! in_array($record->status, [PurchaseRequest::STATUS_DRAFT, PurchaseRequest::STATUS_SUBMITTED, PurchaseRequest::STATUS_APPROVED], true), 422, 'Purchase request cannot be cancelled.');
 
-        $this->setStatus($record, 'cancelled', 'cancel');
+        $this->setStatus($record, PurchaseRequest::STATUS_CANCELLED, 'cancel');
 
         return back()->with('status', 'Purchase request cancelled.');
     }
 
     public function close(PurchaseRequest $record): RedirectResponse
     {
-        abort_if($record->status !== 'approved', 422, 'Only approved purchase requests can be closed.');
+        abort_if($record->status !== PurchaseRequest::STATUS_APPROVED, 422, 'Only approved purchase requests can be closed.');
 
-        $this->setStatus($record, 'closed', 'close');
+        $this->setStatus($record, PurchaseRequest::STATUS_CLOSED, 'close');
 
         return back()->with('status', 'Purchase request closed.');
     }

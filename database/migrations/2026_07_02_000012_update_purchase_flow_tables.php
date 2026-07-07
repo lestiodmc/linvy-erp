@@ -16,7 +16,7 @@ return new class extends Migration
                 $table->date('request_date');
                 $table->foreignId('requested_by')->constrained('users')->restrictOnDelete();
                 $table->string('department')->nullable();
-                $table->enum('status', ['draft', 'submitted', 'approved', 'rejected', 'closed', 'cancelled'])->default('draft');
+                $table->string('status')->default('draft');
                 $table->text('notes')->nullable();
                 $table->timestamps();
             });
@@ -121,6 +121,9 @@ return new class extends Migration
         if (DB::getDriverName() === 'mysql') {
             DB::statement("ALTER TABLE purchase_orders MODIFY status ENUM('draft','submitted','approved','partially_received','fully_received','closed','cancelled') NOT NULL DEFAULT 'draft'");
             DB::statement("ALTER TABLE warehouses MODIFY type ENUM('raw_material','packaging','production','finished_goods','reject','transit') NOT NULL");
+        } elseif (DB::getDriverName() === 'pgsql') {
+            // Existing PostgreSQL installations should keep these columns as portable strings.
+            // Do not force enum/type mutations here; allowed values are enforced in application constants.
         }
 
         if (Schema::hasTable('document_sequences')) {

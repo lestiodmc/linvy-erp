@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
 use App\Models\Receiving;
 use App\Models\Supplier;
 use App\Models\Warehouse;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use InvalidArgumentException;
+use RuntimeException;
 
 class ReceivingController extends Controller
 {
@@ -52,7 +55,7 @@ class ReceivingController extends Controller
                 ->paginate(15)
                 ->withQueryString(),
             'filters' => $filters,
-            'statuses' => ['draft', 'posted', 'cancelled'],
+            'statuses' => Receiving::STATUSES,
             'branches' => $branches,
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
         ]);
@@ -62,7 +65,7 @@ class ReceivingController extends Controller
     {
         $branchIds = $this->accessibleBranches()->pluck('id');
         $po = PurchaseOrder::with(['supplier', 'lines.item.defaultWarehouseType', 'lines.unit'])
-            ->whereIn('status', ['approved', 'partially_received'])
+            ->whereIn('status', [PurchaseOrder::STATUS_APPROVED, PurchaseOrder::STATUS_PARTIALLY_RECEIVED])
             ->when(! Auth::user()?->isSuperAdmin(), fn ($query) => $query->where(function ($branchQuery) use ($branchIds): void {
                 $branchQuery->whereNull('branch_id')->orWhereIn('branch_id', $branchIds);
             }))
@@ -71,7 +74,7 @@ class ReceivingController extends Controller
 
         return $po ? $this->buildFromPo($po) : $this->formView(new Receiving([
             'received_date' => now()->toDateString(),
-            'status' => 'draft',
+            'status' => Receiving::STATUS_DRAFT,
         ]));
     }
 
@@ -88,12 +91,12 @@ class ReceivingController extends Controller
                 $lines = $data['lines'];
                 unset($data['lines']);
 
-                $purchaseOrder = PurchaseOrder::with('lines')->lockForUpdate()->findOrFail($data['purchase_order_id']);
+                $purchaseOrder = PurchaseOrder::with('lines.item')->lockForUpdate()->findOrFail($data['purchase_order_id']);
                 $this->ensureReceivable($purchaseOrder);
                 $this->ensureBranchAccess((int) $data['branch_id']);
                 $this->ensurePurchaseOrderBranch($purchaseOrder, (int) $data['branch_id']);
                 $branch = Branch::findOrFail($data['branch_id']);
-                $legacyWarehouseId = $lines[0]['warehouse_id'] ?? null;
+                $legacyWarehouseId = collect($lines)->pluck('warehouse_id')->filter()->first();
 
                 $record = Receiving::create($data + [
                     'company_id' => $branch->company_id ?: $purchaseOrder->company_id,
@@ -101,7 +104,7 @@ class ReceivingController extends Controller
                     'number' => app(DocumentSequenceService::class)->generate('GOODS_RECEIPT', $branch->company_id ?: $purchaseOrder->company_id, $branch->id),
                     'supplier_id' => $purchaseOrder->supplier_id,
                     'warehouse_id' => $legacyWarehouseId,
-                    'status' => 'draft',
+                    'status' => Receiving::STATUS_DRAFT,
                 ]);
 
                 $this->syncLines($record, $purchaseOrder, $lines);
@@ -130,26 +133,26 @@ class ReceivingController extends Controller
 
     public function edit(Receiving $record): View
     {
-        abort_if($record->status !== 'draft', 422, 'Posted receiving cannot be edited.');
+        abort_if($record->status !== Receiving::STATUS_DRAFT, 422, 'Posted receiving cannot be edited.');
 
-        return $this->formView($record->load(['purchaseOrder.lines', 'lines.warehouse']));
+        return $this->formView($record->load(['purchaseOrder.lines.item', 'lines.warehouse']));
     }
 
     public function update(Request $request, Receiving $record): RedirectResponse
     {
-        abort_if($record->status !== 'draft', 422, 'Posted receiving cannot be edited.');
+        abort_if($record->status !== Receiving::STATUS_DRAFT, 422, 'Posted receiving cannot be edited.');
 
         DB::transaction(function () use ($request, $record): void {
             $data = $this->validated($request);
             $lines = $data['lines'];
             unset($data['lines']);
 
-            $purchaseOrder = PurchaseOrder::with('lines')->lockForUpdate()->findOrFail($data['purchase_order_id']);
+            $purchaseOrder = PurchaseOrder::with('lines.item')->lockForUpdate()->findOrFail($data['purchase_order_id']);
             $this->ensureReceivable($purchaseOrder);
             $this->ensureBranchAccess((int) $data['branch_id']);
             $this->ensurePurchaseOrderBranch($purchaseOrder, (int) $data['branch_id']);
             $branch = Branch::findOrFail($data['branch_id']);
-            $legacyWarehouseId = $lines[0]['warehouse_id'] ?? null;
+            $legacyWarehouseId = collect($lines)->pluck('warehouse_id')->filter()->first();
 
             $record->update($data + [
                 'company_id' => $branch->company_id ?: $purchaseOrder->company_id,
@@ -165,7 +168,7 @@ class ReceivingController extends Controller
 
     public function destroy(Receiving $record): RedirectResponse
     {
-        abort_if($record->status !== 'draft', 422, 'Only draft receiving can be deleted.');
+        abort_if($record->status !== Receiving::STATUS_DRAFT, 422, 'Only draft receiving can be deleted.');
         $record->delete();
 
         return redirect()->route('receivings.index')->with('status', 'Receiving dihapus.');
@@ -173,57 +176,65 @@ class ReceivingController extends Controller
 
     public function post(Receiving $record, InventoryPostingService $inventoryPostingService): RedirectResponse
     {
-        DB::transaction(function () use ($record, $inventoryPostingService): void {
-            $record = Receiving::whereKey($record->id)->lockForUpdate()->firstOrFail();
-            abort_if($record->status !== 'draft', 422, 'Only draft receiving can be posted.');
-            $this->ensureBranchAccess((int) $record->branch_id);
+        try {
+            DB::transaction(function () use ($record, $inventoryPostingService): void {
+                $record = Receiving::whereKey($record->id)->lockForUpdate()->firstOrFail();
+                abort_if($record->status !== Receiving::STATUS_DRAFT, 422, 'Only draft receiving can be posted.');
+                $this->ensureBranchAccess((int) $record->branch_id);
 
-            $record->load(['purchaseOrder.lines', 'lines.item']);
-            $purchaseOrder = PurchaseOrder::whereKey($record->purchase_order_id)->lockForUpdate()->firstOrFail();
-            $this->ensureReceivable($purchaseOrder);
+                $record->load(['purchaseOrder.lines', 'lines.item']);
+                $purchaseOrder = PurchaseOrder::whereKey($record->purchase_order_id)->lockForUpdate()->firstOrFail();
+                $this->ensureReceivable($purchaseOrder);
 
-            foreach ($record->lines as $line) {
-                $warehouse = Warehouse::whereKey($line->warehouse_id)
-                    ->where('is_active', true)
-                    ->where('branch_id', $record->branch_id)
-                    ->first();
+                foreach ($record->lines as $line) {
+                    if ((bool) ($line->item?->track_inventory ?? true)) {
+                        $warehouse = Warehouse::whereKey($line->warehouse_id)
+                            ->where('is_active', true)
+                            ->where('branch_id', $record->branch_id)
+                            ->first();
 
-                if (! $warehouse) {
-                    throw ValidationException::withMessages([
-                        'lines' => 'Warehouse line must belong to the selected receiving branch.',
+                        if (! $warehouse) {
+                            throw ValidationException::withMessages([
+                                'lines' => 'Warehouse line must belong to the selected receiving branch.',
+                            ]);
+                        }
+                    }
+
+                    $poLine = $purchaseOrder->lines()->whereKey($line->purchase_order_line_id)->lockForUpdate()->firstOrFail();
+                    $remaining = (float) $poLine->quantity - (float) $poLine->received_quantity;
+
+                    if ((float) $line->received_quantity <= 0 || (float) $line->received_quantity > $remaining) {
+                        throw ValidationException::withMessages([
+                            'lines' => 'Receiving quantity cannot exceed remaining PO quantity.',
+                        ]);
+                    }
+
+                    $newReceivedQuantity = (float) $poLine->received_quantity + (float) $line->received_quantity;
+                    $poLine->update([
+                        'received_quantity' => $newReceivedQuantity,
+                        'remaining_quantity' => max(0, (float) $poLine->quantity - $newReceivedQuantity),
                     ]);
                 }
 
-                $poLine = $purchaseOrder->lines()->whereKey($line->purchase_order_line_id)->lockForUpdate()->firstOrFail();
-                $remaining = (float) $poLine->quantity - (float) $poLine->received_quantity;
-
-                if ((float) $line->received_quantity <= 0 || (float) $line->received_quantity > $remaining) {
-                    throw ValidationException::withMessages([
-                        'lines' => 'Receiving quantity cannot exceed remaining PO quantity.',
-                    ]);
-                }
-
-                $newReceivedQuantity = (float) $poLine->received_quantity + (float) $line->received_quantity;
-                $poLine->update([
-                    'received_quantity' => $newReceivedQuantity,
-                    'remaining_quantity' => max(0, (float) $poLine->quantity - $newReceivedQuantity),
+                $inventoryPostingService->postReceive($record);
+                $record->approvalLogs()->create([
+                    'action' => 'post',
+                    'user_id' => Auth::id(),
                 ]);
-            }
-
-            $inventoryPostingService->postReceive($record);
-            $record->approvalLogs()->create([
-                'action' => 'post',
-                'user_id' => Auth::id(),
+                $this->refreshPurchaseOrderStatus($purchaseOrder->fresh('lines'));
+            });
+        } catch (InvalidArgumentException|RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'inventory' => $exception->getMessage(),
             ]);
-            $this->refreshPurchaseOrderStatus($purchaseOrder->fresh('lines'));
-        });
+        }
 
         return back()->with('status', 'Receiving posted dan stock masuk tercatat.');
     }
 
     public function cancel(Receiving $record): RedirectResponse
     {
-        if ($record->status === 'posted') {
+        if ($record->status === Receiving::STATUS_POSTED) {
             return back()->withErrors([
                 'status' => 'Receiving yang sudah posted tidak dapat dibatalkan karena stok sudah masuk. Buat fitur reversal terlebih dahulu.',
             ]);
@@ -231,8 +242,8 @@ class ReceivingController extends Controller
 
         DB::transaction(function () use ($record): void {
             $record = Receiving::whereKey($record->id)->lockForUpdate()->firstOrFail();
-            abort_if($record->status !== 'draft', 422, 'Only draft receiving can be cancelled.');
-            $record->update(['status' => 'cancelled']);
+            abort_if($record->status !== Receiving::STATUS_DRAFT, 422, 'Only draft receiving can be cancelled.');
+            $record->update(['status' => Receiving::STATUS_CANCELLED]);
             $record->approvalLogs()->create([
                 'action' => 'cancel',
                 'user_id' => Auth::id(),
@@ -257,7 +268,7 @@ class ReceivingController extends Controller
             'branch_id' => $branch?->id,
             'supplier_id' => $purchaseOrder->supplier_id,
             'received_date' => now()->toDateString(),
-            'status' => 'draft',
+            'status' => Receiving::STATUS_DRAFT,
         ]);
 
         $receivableLines = $purchaseOrder->lines->where('remaining_quantity', '>', 0)->values();
@@ -272,7 +283,7 @@ class ReceivingController extends Controller
                 'previously_received_quantity' => $line->received_quantity,
                 'received_quantity' => $line->remaining_quantity,
                 'remaining_quantity' => 0,
-                'warehouse_id' => $this->suggestWarehouseId($line->item, $branch),
+                'warehouse_id' => (bool) ($line->item?->track_inventory ?? true) ? $this->suggestWarehouseId($line->item, $branch) : null,
                 'unit_id' => $line->unit_id,
                 'unit_cost' => $line->unit_price,
             ]);
@@ -291,6 +302,7 @@ class ReceivingController extends Controller
             'record' => $record,
             'selectedPo' => $this->selectedPurchaseOrderOption($record),
             'selectedItems' => $this->selectedItemOptions($record),
+            'lineItemTracking' => $this->lineItemTracking($record),
             'lineItemWarehouseTypes' => $this->lineItemWarehouseTypes($record),
             'branches' => $branches,
             'selectedBranchId' => $selectedBranchId ?: null,
@@ -343,7 +355,7 @@ class ReceivingController extends Controller
 
     private function validated(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
             'branch_id' => ['required', 'exists:branches,id'],
             'received_date' => ['required', 'date'],
@@ -351,11 +363,18 @@ class ReceivingController extends Controller
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.purchase_order_line_id' => ['required', 'exists:purchase_order_lines,id'],
-            'lines.*.warehouse_id' => ['required', 'exists:warehouses,id'],
+            'lines.*.warehouse_id' => ['nullable', 'exists:warehouses,id'],
             'lines.*.received_quantity' => ['required', 'numeric', 'gt:0'],
             'lines.*.unit_cost' => ['required', 'numeric', 'gte:0'],
+            'lines.*.batch_no' => ['nullable', 'string', 'max:255'],
+            'lines.*.serial_numbers' => ['nullable', 'string'],
+            'lines.*.expiry_date' => ['nullable', 'date'],
             'lines.*.notes' => ['nullable', 'string'],
         ]);
+
+        $this->validateReceivingLineRules($data);
+
+        return $data;
     }
 
     private function syncLines(Receiving $record, PurchaseOrder $purchaseOrder, array $lines): void
@@ -365,15 +384,20 @@ class ReceivingController extends Controller
         foreach ($lines as $line) {
             $poLine = $purchaseOrder->lines->firstWhere('id', (int) $line['purchase_order_line_id']);
             abort_if(! $poLine, 422, 'Receiving line must come from selected purchase order.');
-            $warehouse = Warehouse::whereKey($line['warehouse_id'])
-                ->where('is_active', true)
-                ->whereNotNull('branch_id')
-                ->first();
+            $item = $poLine->item;
+            $tracksInventory = (bool) ($item?->track_inventory ?? true);
 
-            if (! $warehouse || (int) $warehouse->branch_id !== (int) $record->branch_id) {
-                throw ValidationException::withMessages([
-                    'lines' => 'Warehouse line must belong to the selected receiving branch.',
-                ]);
+            if ($tracksInventory) {
+                $warehouse = Warehouse::whereKey($line['warehouse_id'] ?? null)
+                    ->where('is_active', true)
+                    ->whereNotNull('branch_id')
+                    ->first();
+
+                if (! $warehouse || (int) $warehouse->branch_id !== (int) $record->branch_id) {
+                    throw ValidationException::withMessages([
+                        'lines' => 'Warehouse line must belong to the selected receiving branch.',
+                    ]);
+                }
             }
 
             $remaining = (float) $poLine->quantity - (float) $poLine->received_quantity;
@@ -391,17 +415,88 @@ class ReceivingController extends Controller
                 'previously_received_quantity' => $poLine->received_quantity,
                 'received_quantity' => $line['received_quantity'],
                 'remaining_quantity' => $remaining - (float) $line['received_quantity'],
-                'warehouse_id' => $line['warehouse_id'],
+                'warehouse_id' => $tracksInventory ? ($line['warehouse_id'] ?? null) : null,
                 'unit_id' => $poLine->unit_id,
                 'unit_cost' => $line['unit_cost'],
+                'batch_no' => $tracksInventory && (bool) ($item?->is_batch_tracked ?? false) ? ($line['batch_no'] ?? null) : null,
+                'serial_numbers' => $tracksInventory && (bool) ($item?->is_serial_tracked ?? false) ? ($line['serial_numbers'] ?? null) : null,
+                'expiry_date' => $tracksInventory && (bool) ($item?->has_expiry_date ?? false) ? ($line['expiry_date'] ?? null) : null,
                 'notes' => $line['notes'] ?? null,
             ]);
         }
     }
 
+    private function validateReceivingLineRules(array $data): void
+    {
+        $poLineIds = collect($data['lines'])->pluck('purchase_order_line_id')->filter()->map(fn ($id) => (int) $id)->unique();
+        $poLines = PurchaseOrderLine::with('item')
+            ->whereIn('id', $poLineIds)
+            ->get()
+            ->keyBy('id');
+
+        $errors = [];
+
+        foreach ($data['lines'] as $index => $line) {
+            $poLine = $poLines->get((int) $line['purchase_order_line_id']);
+            $item = $poLine?->item;
+            $sku = $item?->sku ?: 'selected item';
+
+            if (! (bool) ($item?->track_inventory ?? true)) {
+                continue;
+            }
+
+            if (blank($line['warehouse_id'] ?? null)) {
+                $errors["lines.$index.warehouse_id"] = 'Warehouse is required for inventory item '.$sku.'.';
+            }
+
+            if ((bool) ($item?->is_batch_tracked ?? false) && blank($line['batch_no'] ?? null)) {
+                $errors["lines.$index.batch_no"] = 'Batch number is required for batch tracked item '.$sku.'.';
+            }
+
+            if ((bool) ($item?->has_expiry_date ?? false) && blank($line['expiry_date'] ?? null)) {
+                $errors["lines.$index.expiry_date"] = 'Expiry date is required for expiry tracked item '.$sku.'.';
+            }
+
+            if (! (bool) ($item?->is_serial_tracked ?? false)) {
+                continue;
+            }
+
+            $serialNumbers = $this->serialNumbers($line['serial_numbers'] ?? null);
+
+            if ($serialNumbers === []) {
+                $errors["lines.$index.serial_numbers"] = 'Serial numbers are required for serial tracked item '.$sku.'.';
+
+                continue;
+            }
+
+            if (count($serialNumbers) !== count(array_unique($serialNumbers))) {
+                $errors["lines.$index.serial_numbers"] = 'Serial numbers must be unique for item '.$sku.'.';
+
+                continue;
+            }
+
+            if (abs((float) ($line['received_quantity'] ?? 0) - count($serialNumbers)) > 0.000001) {
+                $errors["lines.$index.serial_numbers"] = 'Receiving quantity must match serial number count for item '.$sku.'.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    private function serialNumbers(?string $serialNumbers): array
+    {
+        return collect(preg_split('/[\r\n,]+/', (string) $serialNumbers))
+            ->map(fn (string $serialNumber): string => trim($serialNumber))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     private function ensureReceivable(PurchaseOrder $purchaseOrder): void
     {
-        abort_if(! in_array($purchaseOrder->status, ['approved', 'partially_received'], true), 422, 'PO can only be received when approved or partially received.');
+        abort_if(! in_array($purchaseOrder->status, [PurchaseOrder::STATUS_APPROVED, PurchaseOrder::STATUS_PARTIALLY_RECEIVED], true), 422, 'PO can only be received when approved or partially received.');
     }
 
     private function accessibleBranches(): \Illuminate\Support\Collection
@@ -462,6 +557,28 @@ class ReceivingController extends Controller
             ->all();
     }
 
+    private function lineItemTracking(Receiving $record): array
+    {
+        $lines = session()->getOldInput('lines', $record->lines->toArray());
+        $ids = collect($lines)->pluck('item_id')->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return Item::whereIn('id', $ids)
+            ->get(['id', 'track_inventory', 'is_batch_tracked', 'is_serial_tracked', 'has_expiry_date'])
+            ->mapWithKeys(fn (Item $item): array => [
+                $item->id => [
+                    'track_inventory' => (bool) $item->track_inventory,
+                    'is_batch_tracked' => (bool) $item->is_batch_tracked,
+                    'is_serial_tracked' => (bool) $item->is_serial_tracked,
+                    'has_expiry_date' => (bool) $item->has_expiry_date,
+                ],
+            ])
+            ->all();
+    }
+
     private function suggestWarehouseId(?Item $item, ?Branch $branch): ?int
     {
         $warehouseTypeId = $item?->default_warehouse_type_id;
@@ -483,7 +600,7 @@ class ReceivingController extends Controller
         $anyReceived = $purchaseOrder->lines->contains(fn ($line) => (float) $line->received_quantity > 0);
 
         $purchaseOrder->update([
-            'status' => $allReceived ? 'fully_received' : ($anyReceived ? 'partially_received' : 'approved'),
+            'status' => $allReceived ? PurchaseOrder::STATUS_FULLY_RECEIVED : ($anyReceived ? PurchaseOrder::STATUS_PARTIALLY_RECEIVED : PurchaseOrder::STATUS_APPROVED),
         ]);
     }
 

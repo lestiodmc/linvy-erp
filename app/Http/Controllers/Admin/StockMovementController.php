@@ -65,7 +65,7 @@ class StockMovementController extends ResourceController
             'filters' => $filters,
             'companies' => Company::orderBy('name')->pluck('name', 'id')->all(),
             'branches' => Branch::orderBy('name')->pluck('name', 'id')->all(),
-            'warehouses' => Warehouse::orderBy('name')->pluck('name', 'id')->all(),
+            'warehouses' => $this->warehouseRecords(),
             'movementTypes' => $this->movementTypes(),
             'itemCategories' => ItemCategory::orderBy('name')->pluck('name', 'id')->all(),
         ]);
@@ -103,5 +103,13 @@ class StockMovementController extends ResourceController
             'PRODUCTION_OUTPUT',
             'PRODUCTION_INPUT',
         ])->mapWithKeys(fn (string $type): array => [$type => str($type)->replace(['_', '-'], ' ')->title()])->all();
+    }
+
+    private function warehouseRecords()
+    {
+        return Warehouse::with('branch')
+            ->orderBy('branch_id')
+            ->orderBy('name')
+            ->get();
     }
 }

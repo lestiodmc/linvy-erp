@@ -80,6 +80,9 @@ return new class extends Migration
             DB::statement('ALTER TABLE stock_movements MODIFY movement_type VARCHAR(32) NOT NULL');
             DB::statement('ALTER TABLE stock_movements MODIFY unit_cost DECIMAL(18, 6) NULL');
             DB::statement('ALTER TABLE stock_movements MODIFY total_cost DECIMAL(18, 6) NULL');
+        } elseif (DB::getDriverName() === 'pgsql') {
+            // PostgreSQL type changes are intentionally not forced in this compatibility migration.
+            // Fresh PostgreSQL schemas should create these columns with portable definitions.
         }
 
         Schema::table('stock_balances', function (Blueprint $table) {
@@ -142,6 +145,8 @@ return new class extends Migration
 
         if (DB::getDriverName() === 'mysql') {
             DB::statement('ALTER TABLE stock_balances MODIFY average_cost DECIMAL(18, 6) NOT NULL DEFAULT 0');
+        } elseif (DB::getDriverName() === 'pgsql') {
+            // Keep existing PostgreSQL numeric definitions intact; avoid destructive precision/default rewrites.
         }
     }
 

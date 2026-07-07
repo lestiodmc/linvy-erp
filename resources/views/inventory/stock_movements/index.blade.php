@@ -62,7 +62,7 @@
             <x-ui.date-range :from="$filters['date_from'] ?? ''" :to="$filters['date_to'] ?? ''" />
             <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies" all-label="All companies" />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches" all-label="All branches" />
-            <x-ui.select-filter name="warehouse_id" label="Warehouse" :value="$filters['warehouse_id'] ?? ''" :options="$warehouses" all-label="All warehouses" />
+            <x-ui.warehouse-filter :warehouses="$warehouses" :value="$filters['warehouse_id'] ?? ''" />
             <x-ui.select-filter name="movement_type" label="Movement Type" :value="$filters['movement_type'] ?? ''" :options="$movementTypes" all-label="All movements" />
             <x-ui.select-filter name="item_category_id" label="Item Category" :value="$filters['item_category_id'] ?? ''" :options="$itemCategories" all-label="All categories" />
             <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Apply</button>
@@ -78,11 +78,13 @@
                     <th class="{{ $headCell }} whitespace-nowrap">Company</th>
                     <th class="{{ $headCell }} whitespace-nowrap">Branch</th>
                     <th class="{{ $headCell }} whitespace-nowrap">Warehouse</th>
+                    <th class="{{ $headCell }} whitespace-nowrap">Batch</th>
+                    <th class="{{ $headCell }} whitespace-nowrap">Expiry</th>
                     <th class="{{ $headCell }} whitespace-nowrap">Movement Type</th>
                     <th class="{{ $headCell }} whitespace-nowrap text-right">Qty In</th>
                     <th class="{{ $headCell }} whitespace-nowrap text-right">Qty Out</th>
                     <th class="{{ $headCell }} whitespace-nowrap">UoM</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Reference</th>
+                    <th class="{{ $headCell }} min-w-40 whitespace-nowrap">Reference</th>
                     <th class="{{ $headCell }} whitespace-nowrap text-right">Action</th>
                 </tr>
             </x-slot:head>
@@ -101,11 +103,13 @@
                     <td class="{{ $cell }} whitespace-nowrap"><span class="{{ $badge }}">{{ $record->company?->name ?: $record->warehouse?->company?->name ?: '-' }}</span></td>
                     <td class="{{ $cell }} whitespace-nowrap"><span class="{{ $badge }}">{{ $record->branch?->name ?: $record->warehouse?->branch?->name ?: '-' }}</span></td>
                     <td class="{{ $cell }} whitespace-nowrap"><span class="{{ $badge }}">{{ $record->warehouse?->name ?: '-' }}</span></td>
+                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ filled($record->batch_no) ? $record->batch_no : 'No Batch' }}</td>
+                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $formatDate($record->expiry_date) }}</td>
                     <td class="{{ $cell }} whitespace-nowrap"><x-ui.movement-type-badge :type="$movementLabel($record)" /></td>
                     <td class="{{ $cell }} whitespace-nowrap text-right font-semibold {{ $inQty > 0 ? 'text-emerald-700' : 'text-slate-400' }}">{{ $formatQty($inQty) }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-right font-semibold {{ $outQty > 0 ? 'text-red-700' : 'text-slate-400' }}">{{ $formatQty($outQty) }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $record->uom?->code ?: $record->item?->baseUnit?->code ?: '-' }}</td>
-                    <td class="{{ $cell }} whitespace-nowrap">
+                    <td class="{{ $cell }} min-w-40 whitespace-nowrap">
                         @if($sourceUrl)
                             <a href="{{ $sourceUrl }}" class="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline">{{ $reference }}</a>
                         @else
@@ -117,7 +121,7 @@
                     </td>
                 </tr>
             @empty
-                <x-ui.empty-state colspan="12" message="No stock movements found." />
+                <x-ui.empty-state colspan="14" message="No stock movements found." />
             @endforelse
         </x-ui.data-table>
 

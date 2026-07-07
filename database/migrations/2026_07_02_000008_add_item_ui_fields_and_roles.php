@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('items', function (Blueprint $table) {
-            $table->enum('cost_method', ['standard', 'average', 'fifo'])->default('standard')->after('standard_cost');
+            $table->string('cost_method')->default('standard')->after('standard_cost');
             $table->boolean('use_category_default_accounts')->default(true)->after('cost_method');
         });
 

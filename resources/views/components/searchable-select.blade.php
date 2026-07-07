@@ -8,6 +8,7 @@
     'descriptionTarget' => null,
     'onSelect' => null,
     'inputClass' => 'w-full',
+    'extraParams' => [],
 ])
 
 @once
@@ -22,6 +23,7 @@
                 unitTarget: config.unitTarget || null,
                 descriptionTarget: config.descriptionTarget || null,
                 onSelect: config.onSelect || null,
+                extraParams: config.extraParams || {},
                 results: [],
                 open: false,
                 loading: false,
@@ -75,7 +77,14 @@
                 },
 
                 search() {
+                    const hadSelection = Boolean(this.selectedId);
                     this.selectedId = '';
+                    if (hadSelection) {
+                        this.$root.dispatchEvent(new CustomEvent('linvy-searchable-cleared', {
+                            bubbles: true,
+                            detail: { name: this.name },
+                        }));
+                    }
                     clearTimeout(this.timer);
 
                     if (this.query.trim().length < 2) {
@@ -95,7 +104,20 @@
                     this.open = true;
                     this.searched = true;
 
-                    fetch(`${this.url}?q=${encodeURIComponent(this.query)}`, {
+                    const url = new URL(this.url, window.location.origin);
+                    url.searchParams.set('q', this.query);
+
+                    Object.entries(this.extraParams).forEach(([param, selector]) => {
+                        const target = this.$root.closest('form')?.querySelector(selector)
+                            || this.$root.closest('tr')?.querySelector(selector)
+                            || document.querySelector(selector);
+
+                        if (target?.value) {
+                            url.searchParams.set(param, target.value);
+                        }
+                    });
+
+                    fetch(url, {
                         headers: { Accept: 'application/json' },
                     })
                         .then((response) => response.ok ? response.json() : [])
@@ -142,7 +164,7 @@
 
                     if (this.onSelect) {
                         const callback = new Function('option', this.onSelect);
-                        callback(option);
+                        callback.call(this, option);
                     }
 
                     setTimeout(() => {
@@ -180,6 +202,7 @@
         unitTarget: @js($unitTarget),
         descriptionTarget: @js($descriptionTarget),
         onSelect: @js($onSelect),
+        extraParams: @js($extraParams),
     })"
     @click.outside="if (!selectingOption) open = false"
 >
@@ -229,8 +252,10 @@
                 @pointerdown.prevent.stop="select(option)"
                 @mousedown.prevent.stop
                 @click.prevent.stop
-                x-text="option.text"
-            ></button>
+            >
+                <span class="block" x-text="option.text"></span>
+                <span x-show="option.meta_text" class="mt-0.5 block text-xs font-semibold text-slate-500" x-text="option.meta_text"></span>
+            </button>
         </template>
     </div>
 </div>

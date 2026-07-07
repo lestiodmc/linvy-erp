@@ -25,6 +25,12 @@
             <tbody class="divide-y divide-slate-100">
                 {{ $slot }}
             </tbody>
+
+            @isset($foot)
+                <tfoot>
+                    {{ $foot }}
+                </tfoot>
+            @endisset
         </table>
     </div>
 

@@ -23,6 +23,12 @@
             method="POST"
             action="{{ $action }}"
             x-data="{
+                trackInventory: @js((bool) $value('track_inventory', true)),
+                allowNegativeStock: @js((bool) $value('allow_negative_stock', false)),
+                batchTracked: @js((bool) $value('is_batch_tracked', false)),
+                serialTracked: @js((bool) $value('is_serial_tracked', false)),
+                hasExpiryDate: @js((bool) $value('has_expiry_date', false)),
+                itemType: @js((string) $value('item_type', 'INVENTORY')),
                 applyCategory(event) {
                     const option = event.target.selectedOptions[0];
 
@@ -34,10 +40,41 @@
                     const warehouseTypeId = option.dataset.warehouseTypeId || '';
 
                     if (itemType) {
-                        this.$refs.itemType.value = itemType;
+                        this.itemType = itemType;
                     }
 
                     this.$refs.defaultWarehouseType.value = warehouseTypeId;
+                    this.syncInventoryTracking('item_type');
+                },
+                syncInventoryTracking(changed) {
+                    if (this.itemType !== 'INVENTORY') {
+                        this.trackInventory = false;
+                    }
+
+                    if (!this.trackInventory) {
+                        this.allowNegativeStock = false;
+                        this.batchTracked = false;
+                        this.serialTracked = false;
+                        this.hasExpiryDate = false;
+                        return;
+                    }
+
+                    if (changed === 'batch' && this.batchTracked) {
+                        this.trackInventory = true;
+                        this.serialTracked = false;
+                    }
+
+                    if (changed === 'serial' && this.serialTracked) {
+                        this.trackInventory = true;
+                        this.batchTracked = false;
+                        this.hasExpiryDate = false;
+                    }
+
+                    if (changed === 'expiry' && this.hasExpiryDate) {
+                        this.trackInventory = true;
+                        this.batchTracked = true;
+                        this.serialTracked = false;
+                    }
                 }
             }"
             class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -76,6 +113,11 @@
                                                 name="{{ $name }}"
                                                 value="1"
                                                 @checked((bool) $currentValue)
+                                                @if($name === 'track_inventory') x-model="trackInventory" @change="syncInventoryTracking('track')" @endif
+                                                @if($name === 'allow_negative_stock') x-model="allowNegativeStock" :disabled="!trackInventory" @endif
+                                                @if($name === 'is_batch_tracked') x-model="batchTracked" :disabled="!trackInventory" @change="syncInventoryTracking('batch')" @endif
+                                                @if($name === 'is_serial_tracked') x-model="serialTracked" :disabled="!trackInventory" @change="syncInventoryTracking('serial')" @endif
+                                                @if($name === 'has_expiry_date') x-model="hasExpiryDate" :disabled="!trackInventory" @change="syncInventoryTracking('expiry')" @endif
                                                 class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-600"
                                             >
                                             {{ $field['label'] }}
@@ -88,7 +130,7 @@
                                                 id="{{ $name }}"
                                                 name="{{ $name }}"
                                                 @if($name === 'item_category_id') @change="applyCategory($event)" @endif
-                                                @if($name === 'item_type') x-ref="itemType" @endif
+                                                @if($name === 'item_type') x-model="itemType" @change="syncInventoryTracking('item_type')" @endif
                                                 @if($name === 'default_warehouse_type_id') x-ref="defaultWarehouseType" @endif
                                                 class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-600"
                                             >

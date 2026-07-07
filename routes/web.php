@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeliveryOrderController;
 use App\Http\Controllers\Admin\DocumentSequenceController;
+use App\Http\Controllers\Admin\ItemLedgerController;
 use App\Http\Controllers\Admin\ItemCategoryController;
 use App\Http\Controllers\Admin\ItemController;
 use App\Http\Controllers\Admin\ModuleSettingController;
@@ -87,9 +88,24 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('module:inventory')->group(function () {
+        Route::get('inventory/item-ledger', [ItemLedgerController::class, 'index'])->name('item-ledger.index');
+        Route::get('inventory/item-ledger/export-excel', [ItemLedgerController::class, 'exportExcel'])->name('item-ledger.export-excel');
+        Route::get('inventory/item-ledger/export-pdf', [ItemLedgerController::class, 'exportPdf'])->name('item-ledger.export-pdf');
+        Route::get('inventory/stock-adjustments/current-stock', [StockAdjustmentController::class, 'currentStock']);
+        Route::get('inventory/stock-adjustments/item-info', [StockAdjustmentController::class, 'itemInfo'])->name('inventory.stock-adjustments.item-info');
         Route::resource('stock-movements', StockMovementController::class)->only(['index', 'show'])->parameters(['stock-movements' => 'record']);
+        Route::get('stock-balances/{record}/batches', [StockBalanceController::class, 'batches'])->name('stock-balances.batches');
         Route::resource('stock-balances', StockBalanceController::class)->only(['index', 'show'])->parameters(['stock-balances' => 'record']);
+        Route::get('warehouse-transfers/items/search', [WarehouseTransferController::class, 'items'])->name('warehouse-transfers.items');
+        Route::get('warehouse-transfers/item-info', [WarehouseTransferController::class, 'itemInfo'])->name('warehouse-transfers.item-info');
+        Route::get('warehouse-transfers/warehouse-stats', [WarehouseTransferController::class, 'warehouseStats'])->name('warehouse-transfers.warehouse-stats');
+        Route::post('warehouse-transfers/{record}/post', [WarehouseTransferController::class, 'post'])->name('warehouse-transfers.post');
+        Route::post('warehouse-transfers/{record}/cancel', [WarehouseTransferController::class, 'cancel'])->name('warehouse-transfers.cancel');
         Route::resource('warehouse-transfers', WarehouseTransferController::class)->parameters(['warehouse-transfers' => 'record']);
+        Route::get('stock-adjustments/current-stock', [StockAdjustmentController::class, 'currentStock'])->name('stock-adjustments.current-stock');
+        Route::get('stock-adjustments/items/search', [StockAdjustmentController::class, 'items'])->name('stock-adjustments.items');
+        Route::post('stock-adjustments/{record}/post', [StockAdjustmentController::class, 'post'])->name('stock-adjustments.post');
+        Route::post('stock-adjustments/{record}/cancel', [StockAdjustmentController::class, 'cancel'])->name('stock-adjustments.cancel');
         Route::resource('stock-adjustments', StockAdjustmentController::class)->parameters(['stock-adjustments' => 'record']);
     });
 

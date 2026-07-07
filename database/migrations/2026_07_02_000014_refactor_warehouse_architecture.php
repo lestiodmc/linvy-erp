@@ -74,6 +74,9 @@ return new class extends Migration
 
         if (DB::getDriverName() === 'mysql' && Schema::hasColumn('warehouses', 'type')) {
             DB::statement('ALTER TABLE warehouses MODIFY type VARCHAR(255) NULL');
+        } elseif (DB::getDriverName() === 'pgsql' && Schema::hasColumn('warehouses', 'type')) {
+            // PostgreSQL-compatible installations should keep this legacy column as text/varchar.
+            // Avoid forcing a type mutation here because existing deployments may already differ.
         }
 
         $branchId = DB::table('branches')->where('code', 'SBY')->value('id');
@@ -120,10 +123,23 @@ return new class extends Migration
         });
 
         DB::table('receiving_lines')
-            ->join('receivings', 'receiving_lines.receiving_id', '=', 'receivings.id')
-            ->whereNull('receiving_lines.warehouse_id')
-            ->whereNotNull('receivings.warehouse_id')
-            ->update(['receiving_lines.warehouse_id' => DB::raw('receivings.warehouse_id')]);
+            ->whereNull('warehouse_id')
+            ->orderBy('id')
+            ->chunkById(200, function ($lines): void {
+                foreach ($lines as $line) {
+                    $warehouseId = DB::table('receivings')
+                        ->where('id', $line->receiving_id)
+                        ->whereNotNull('warehouse_id')
+                        ->value('warehouse_id');
+
+                    if ($warehouseId) {
+                        DB::table('receiving_lines')
+                            ->where('id', $line->id)
+                            ->whereNull('warehouse_id')
+                            ->update(['warehouse_id' => $warehouseId]);
+                    }
+                }
+            });
     }
 
     public function down(): void

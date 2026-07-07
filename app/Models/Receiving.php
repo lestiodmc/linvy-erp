@@ -9,6 +9,16 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Receiving extends Model
 {
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_POSTED = 'posted';
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_POSTED,
+        self::STATUS_CANCELLED,
+    ];
+
     protected $guarded = [];
 
     protected $casts = [
