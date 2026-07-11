@@ -82,6 +82,7 @@ class DatabaseSeeder extends Seeder
             ['code' => 'STOCK_ADJUSTMENT', 'name' => 'Stock Adjustment', 'prefix' => 'ADJ'],
             ['code' => 'STOCK_OPNAME', 'name' => 'Stock Opname', 'prefix' => 'STKOP'],
             ['code' => 'WAREHOUSE_TRANSFER', 'name' => 'Warehouse Transfer', 'prefix' => 'TRF'],
+            ['code' => 'BATCH_ASSIGNMENT', 'name' => 'Batch Assignment', 'prefix' => 'BAS'],
             ['code' => 'PRODUCTION_ORDER', 'name' => 'Production / Repacking', 'prefix' => 'PRD'],
         ] as $sequence) {
             DocumentSequence::updateOrCreate(['code' => $sequence['code']], $sequence + [

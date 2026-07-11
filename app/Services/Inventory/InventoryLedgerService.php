@@ -364,6 +364,14 @@ class InventoryLedgerService
 
     private function movementLabel(StockMovement $movement): string
     {
+        if ($this->normalizedType($movement) === 'BATCH-ASSIGNMENT-IN') {
+            return 'Batch Assignment In';
+        }
+
+        if ($this->normalizedType($movement) === 'BATCH-ASSIGNMENT-OUT') {
+            return 'Batch Assignment Out';
+        }
+
         return str($movement->transaction_type ?: $movement->movement_type ?: 'Reference')
             ->replace(['_', '-'], ' ')
             ->upper()
@@ -384,6 +392,7 @@ class InventoryLedgerService
             'RCV', 'PURCHASE-RECEIVE' => 'receivings.show',
             'ADJ-IN', 'ADJ-OUT', 'ADJUSTMENT-IN', 'ADJUSTMENT-OUT' => 'stock-adjustments.show',
             'TRF-IN', 'TRF-OUT', 'TRANSFER-IN', 'TRANSFER-OUT' => 'warehouse-transfers.show',
+            'BATCH-ASSIGNMENT-IN', 'BATCH-ASSIGNMENT-OUT' => 'batch-assignments.show',
             default => null,
         };
 

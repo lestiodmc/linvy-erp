@@ -96,7 +96,13 @@ Route::middleware('auth')->group(function () {
         Route::get('inventory/stock-adjustments/item-info', [StockAdjustmentController::class, 'itemInfo'])->name('inventory.stock-adjustments.item-info');
         Route::resource('stock-movements', StockMovementController::class)->only(['index', 'show'])->parameters(['stock-movements' => 'record']);
         Route::get('stock-balances/{record}/batches', [StockBalanceController::class, 'batches'])->name('stock-balances.batches');
+        Route::get('batch-assignments/eligible-items', [BatchAssignmentController::class, 'eligibleItems'])->name('batch-assignments.eligible-items');
+        Route::get('batch-assignments/batches', [BatchAssignmentController::class, 'batches'])->name('batch-assignments.batches');
+        Route::get('batch-assignments/warehouses', [BatchAssignmentController::class, 'warehouseOptions'])->name('batch-assignments.warehouses');
+        Route::get('batch-assignments/branches', [BatchAssignmentController::class, 'branchOptions'])->name('batch-assignments.branches');
         Route::post('batch-assignments/{batchAssignment}/post', [BatchAssignmentController::class, 'post'])->name('batch-assignments.post');
+        Route::post('batch-assignments/{batchAssignment}/cancel', [BatchAssignmentController::class, 'cancel'])->name('batch-assignments.cancel');
+        Route::resource('batch-assignments', BatchAssignmentController::class)->except(['destroy'])->parameters(['batch-assignments' => 'batchAssignment']);
         Route::resource('stock-balances', StockBalanceController::class)->only(['index', 'show'])->parameters(['stock-balances' => 'record']);
         Route::get('warehouse-transfers/items/search', [WarehouseTransferController::class, 'items'])->name('warehouse-transfers.items');
         Route::get('warehouse-transfers/item-info', [WarehouseTransferController::class, 'itemInfo'])->name('warehouse-transfers.item-info');

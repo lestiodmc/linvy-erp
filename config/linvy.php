@@ -57,6 +57,7 @@ return [
                 ['label' => 'Item Ledger', 'route' => 'item-ledger.index', 'routes' => ['item-ledger.*']],
                 ['label' => 'Warehouse Transfers', 'route' => 'warehouse-transfers.index', 'routes' => ['warehouse-transfers.*']],
                 ['label' => 'Stock Adjustments', 'route' => 'stock-adjustments.index', 'routes' => ['stock-adjustments.*']],
+                ['label' => 'Batch Assignments', 'route' => 'batch-assignments.index', 'routes' => ['batch-assignments.*']],
             ],
         ],
         'production' => [

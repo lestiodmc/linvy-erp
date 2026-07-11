@@ -106,6 +106,8 @@ class ItemLedgerController extends Controller
             'ADJUSTMENT_OUT',
             'ADJ-IN',
             'ADJ-OUT',
+            'BATCH_ASSIGNMENT_IN',
+            'BATCH_ASSIGNMENT_OUT',
             'DO',
             'SERVICE',
             'RETURN-IN',

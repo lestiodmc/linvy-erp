@@ -30,6 +30,8 @@ class StockMovement extends Model
     public const TRANSACTION_SERVICE = 'SERVICE';
     public const TRANSACTION_RETURN_IN = 'RETURN-IN';
     public const TRANSACTION_RETURN_OUT = 'RETURN-OUT';
+    public const TRANSACTION_BATCH_ASSIGNMENT_IN = 'BATCH_ASSIGNMENT_IN';
+    public const TRANSACTION_BATCH_ASSIGNMENT_OUT = 'BATCH_ASSIGNMENT_OUT';
 
     protected $table = 'stock_movements';
 

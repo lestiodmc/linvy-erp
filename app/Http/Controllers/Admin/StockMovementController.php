@@ -105,6 +105,8 @@ class StockMovementController extends ResourceController
             'ADJUSTMENT_OUT',
             'ADJ-IN',
             'ADJ-OUT',
+            'BATCH_ASSIGNMENT_IN',
+            'BATCH_ASSIGNMENT_OUT',
             'DO',
             'SERVICE',
             'PRODUCTION_OUTPUT',

@@ -66,6 +66,7 @@
                                     @if(Auth::user()?->canAccessModule('inventory') && \App\Support\ModuleManager::enabled('inventory'))
                                         <x-dropdown-link :href="route('warehouse-transfers.create')">New Transfer</x-dropdown-link>
                                         <x-dropdown-link :href="route('stock-adjustments.create')">New Adjustment</x-dropdown-link>
+                                        <x-dropdown-link :href="route('batch-assignments.create')">New Batch Assignment</x-dropdown-link>
                                     @endif
                                     @if(Auth::user()?->canAccessModule('production') && \App\Support\ModuleManager::enabled('production'))
                                         <x-dropdown-link :href="route('productions.create')">New Repacking Order</x-dropdown-link>

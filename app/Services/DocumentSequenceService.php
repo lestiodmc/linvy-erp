@@ -19,6 +19,7 @@ class DocumentSequenceService
         'DO' => 'DELIVERY_ORDER',
         'ADJ' => 'STOCK_ADJUSTMENT',
         'TRF' => 'WAREHOUSE_TRANSFER',
+        'BAS' => 'BATCH_ASSIGNMENT',
         'PRD' => 'PRODUCTION_ORDER',
         'purchase_request' => 'PURCHASE_REQUEST',
         'purchase_order' => 'PURCHASE_ORDER',
@@ -27,6 +28,7 @@ class DocumentSequenceService
         'delivery_order' => 'DELIVERY_ORDER',
         'stock_adjustment' => 'STOCK_ADJUSTMENT',
         'warehouse_transfer' => 'WAREHOUSE_TRANSFER',
+        'batch_assignment' => 'BATCH_ASSIGNMENT',
         'production' => 'PRODUCTION_ORDER',
     ];
 
