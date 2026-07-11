@@ -11,13 +11,6 @@
         $formatDate = fn ($date) => $date ? \Illuminate\Support\Carbon::parse($date)->format('d M Y') : '-';
         $cell = 'px-3 py-2';
         $headCell = 'px-3 py-2 text-left text-[11px] font-black uppercase tracking-wide text-slate-500';
-        $movementBadge = function (string $direction): string {
-            return match ($direction) {
-                'in' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-                'out' => 'bg-red-50 text-red-700 ring-red-100',
-                default => 'bg-slate-100 text-slate-700 ring-slate-200',
-            };
-        };
         $summaryCards = [
             ['label' => 'Opening Balance', 'value' => $openingBalance, 'class' => 'text-slate-900'],
             ['label' => 'Total In', 'value' => $ledger['total_in'], 'class' => 'text-emerald-700'],
@@ -142,13 +135,13 @@
 
             @forelse($ledger['rows'] as $row)
                 @php($movement = $row['movement'])
-                <tr class="text-xs hover:bg-slate-50">
+                <tr class="text-xs">
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $formatDate($row['date']) }}</td>
                     <td class="{{ $cell }} whitespace-nowrap">
-                        <a href="{{ $row['reference_url'] }}" class="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline">{{ $row['reference_no'] }}</a>
+                        <a href="{{ $row['reference_url'] }}" class="theme-link font-semibold hover:underline">{{ $row['reference_no'] }}</a>
                     </td>
                     <td class="{{ $cell }} whitespace-nowrap">
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 {{ $movementBadge($row['movement_direction']) }}">{{ $row['movement_label'] }}</span>
+                        <x-ui.status-badge :status="$row['movement_direction']" :label="$row['movement_label']" />
                     </td>
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $movement->reference_type ?: '-' }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $movement->warehouse?->name ?: '-' }}</td>
@@ -163,7 +156,7 @@
                     <td class="{{ $cell }} max-w-64 truncate text-slate-600" title="{{ $movement->remarks ?: $movement->notes }}">{{ $movement->remarks ?: $movement->notes ?: '-' }}</td>
                 </tr>
             @empty
-                <x-ui.empty-state colspan="14" message="No inventory movement found." />
+                <x-ui.empty-state colspan="14" message="No inventory movements found." description="No ledger activity matches the selected filters." />
             @endforelse
         </x-ui.data-table>
 

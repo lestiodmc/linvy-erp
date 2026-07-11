@@ -77,7 +77,7 @@
                     }
                 }
             }"
-            class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+            class="enterprise-form overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
         >
             @csrf
             @if($method !== 'POST')

@@ -10,20 +10,20 @@ use App\Models\Inventory\StockBatchBalance;
 use App\Models\ItemCategory;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
+use App\Support\InventoryExpiryStatus;
+use App\Support\InventoryReconciliation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class StockBalanceController extends Controller
 {
-    private const NEAR_EXPIRY_DAYS = 30;
-    private const QTY_TOLERANCE = 0.000001;
-
     public function index(): View
     {
         $filters = request()->only(['keyword', 'company_id', 'branch_id', 'warehouse_id', 'item_category_id', 'stock_status', 'batch_tracking', 'reconciliation_status']);
         $branchIds = $this->accessibleBranches()->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $onHand = 'COALESCE(NULLIF(stock_balances.qty_on_hand, 0), stock_balances.quantity_on_hand, 0)';
+        $onHand = InventoryReconciliation::onHandExpression();
+        $difference = InventoryReconciliation::differenceExpression($onHand);
+        $tolerance = InventoryReconciliation::tolerance();
         $reserved = 'COALESCE(NULLIF(stock_balances.qty_reserved, 0), stock_balances.quantity_reserved, 0)';
         $batchTotals = StockBatchBalance::query()
             ->selectRaw('warehouse_id, item_id, SUM(qty_on_hand) as batch_total')
@@ -57,8 +57,8 @@ class StockBalanceController extends Controller
             ->when(($filters['stock_status'] ?? '') === 'ZERO_STOCK', fn (Builder $query) => $query->whereRaw($onHand.' = 0'))
             ->when(($filters['stock_status'] ?? '') === 'NEGATIVE_STOCK', fn (Builder $query) => $query->whereRaw($onHand.' < 0'))
             ->when(($filters['stock_status'] ?? '') === 'LOW_STOCK', fn (Builder $query) => $query->whereHas('item', fn (Builder $item) => $item->where('minimum_order_qty', '>', 0))->whereRaw($onHand.' > 0')->whereRaw($onHand.' <= (SELECT minimum_order_qty FROM items WHERE items.id = stock_balances.item_id)'))
-            ->when(($filters['reconciliation_status'] ?? '') === 'MATCHED', fn (Builder $query) => $query->whereHas('item', fn (Builder $item) => $item->where('is_batch_tracked', true))->whereRaw('ABS('.$onHand.' - COALESCE(batch_totals.batch_total, 0)) <= ?', [self::QTY_TOLERANCE]))
-            ->when(($filters['reconciliation_status'] ?? '') === 'MISMATCH', fn (Builder $query) => $query->whereHas('item', fn (Builder $item) => $item->where('is_batch_tracked', true))->whereRaw('ABS('.$onHand.' - COALESCE(batch_totals.batch_total, 0)) > ?', [self::QTY_TOLERANCE]))
+            ->when(($filters['reconciliation_status'] ?? '') === 'MATCHED', fn (Builder $query) => $query->whereHas('item', fn (Builder $item) => $item->where('is_batch_tracked', true))->whereRaw($difference.' <= ?', [$tolerance]))
+            ->when(($filters['reconciliation_status'] ?? '') === 'MISMATCH', fn (Builder $query) => $query->whereHas('item', fn (Builder $item) => $item->where('is_batch_tracked', true))->whereRaw($difference.' > ?', [$tolerance]))
             ->orderBy('stock_balances.warehouse_id')->orderBy('stock_balances.item_id')
             ->paginate(15)->withQueryString();
 
@@ -89,7 +89,7 @@ class StockBalanceController extends Controller
             'record' => $record, 'onHand' => $onHand, 'reserved' => $this->reserved($record), 'available' => $onHand - $this->reserved($record),
             'batchBalances' => $batchBalances, 'batchTotal' => $batchTotal,
             'reconciliationDifference' => $onHand - $batchTotal,
-            'statusForBatch' => fn (mixed $expiryDate): array => $this->batchStatus($expiryDate),
+            'statusForBatch' => fn (mixed $expiryDate): array => [InventoryExpiryStatus::status($expiryDate), InventoryExpiryStatus::badge(InventoryExpiryStatus::status($expiryDate))],
         ]);
     }
 
@@ -117,7 +117,7 @@ class StockBalanceController extends Controller
 
     private function onHand(StockBalance $record): float
     {
-        return (float) ($record->qty_on_hand ?: $record->quantity_on_hand ?: 0);
+        return (float) ($record->qty_on_hand ?? 0);
     }
 
     private function reserved(StockBalance $record): float
@@ -125,12 +125,4 @@ class StockBalanceController extends Controller
         return (float) ($record->qty_reserved ?: $record->quantity_reserved ?: 0);
     }
 
-    private function batchStatus(mixed $expiryDate): array
-    {
-        if (blank($expiryDate)) return ['NO_EXPIRY', 'bg-slate-100 text-slate-700 ring-slate-200'];
-        $expiry = Carbon::parse($expiryDate)->startOfDay();
-        if ($expiry->lt(now()->startOfDay())) return ['EXPIRED', 'bg-red-50 text-red-700 ring-red-100'];
-        if ($expiry->lte(now()->startOfDay()->addDays(self::NEAR_EXPIRY_DAYS))) return ['NEAR_EXPIRY', 'bg-amber-50 text-amber-700 ring-amber-100'];
-        return ['VALID', 'bg-emerald-50 text-emerald-700 ring-emerald-100'];
-    }
 }

@@ -33,6 +33,36 @@ class StockMovement extends Model
     public const TRANSACTION_BATCH_ASSIGNMENT_IN = 'BATCH_ASSIGNMENT_IN';
     public const TRANSACTION_BATCH_ASSIGNMENT_OUT = 'BATCH_ASSIGNMENT_OUT';
 
+    public static function transactionTypeLabels(): array
+    {
+        return [
+            'RCV' => 'Purchase Receive', 'RECEIVE' => 'Purchase Receive', 'PURCHASE_RECEIVE' => 'Purchase Receive',
+            'IN' => 'Inventory In', 'OUT' => 'Inventory Out',
+            self::TRANSACTION_TRF_IN => 'Transfer In', self::TRANSACTION_TRF_OUT => 'Transfer Out', self::LEGACY_TRANSACTION_TRF_IN => 'Transfer In', self::LEGACY_TRANSACTION_TRF_OUT => 'Transfer Out',
+            self::TRANSACTION_ADJ_IN => 'Adjustment In', self::TRANSACTION_ADJ_OUT => 'Adjustment Out', self::LEGACY_TRANSACTION_ADJ_IN => 'Adjustment In', self::LEGACY_TRANSACTION_ADJ_OUT => 'Adjustment Out',
+            'ADJUSTMENT_PLUS' => 'Adjustment In', 'ADJUSTMENT_MINUS' => 'Adjustment Out',
+            self::TRANSACTION_BATCH_ASSIGNMENT_IN => 'Batch Assignment In', self::TRANSACTION_BATCH_ASSIGNMENT_OUT => 'Batch Assignment Out',
+            self::TRANSACTION_DO => 'Sales Delivery', 'SALE_DELIVERY' => 'Sales Delivery', self::TRANSACTION_SERVICE => 'Production Consumption',
+            'RETURN-IN' => 'Return In', 'RETURN-OUT' => 'Return Out', 'PRODUCTION_OUTPUT' => 'Production Output', 'PRODUCTION_INPUT' => 'Production Input',
+        ];
+    }
+
+    public static function typeLabel(?string $type): string
+    {
+        $normalized = strtoupper(str_replace('-', '_', (string) $type));
+        $labels = collect(self::transactionTypeLabels())->mapWithKeys(fn (string $label, string $key): array => [strtoupper(str_replace('-', '_', $key)) => $label]);
+
+        return $labels[$normalized] ?? str($type ?: 'Unknown')->replace(['_', '-'], ' ')->title()->toString();
+    }
+
+    public function quantityIn(): float { return (float) ($this->quantity_in ?? 0); }
+    public function quantityOut(): float { return (float) ($this->quantity_out ?? 0); }
+    public function direction(): string
+    {
+        $in = $this->quantityIn() > 0; $out = $this->quantityOut() > 0;
+        return $in && $out ? 'INVALID' : ($in ? self::MOVEMENT_IN : ($out ? self::MOVEMENT_OUT : 'NEUTRAL'));
+    }
+
     protected $table = 'stock_movements';
 
     protected $fillable = [

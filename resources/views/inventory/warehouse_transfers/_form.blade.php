@@ -27,7 +27,7 @@
     <div class="mx-auto max-w-screen-2xl">
         @include('purchase.shared.flash')
 
-        <form method="POST" action="{{ $action }}" class="space-y-3" data-transfer-form>
+        <form method="POST" action="{{ $action }}" class="enterprise-form space-y-3" data-transfer-form>
             @csrf
             @if($method !== 'POST')
                 @method($method)
@@ -175,7 +175,7 @@
                 </div>
             </section>
 
-            <div class="sticky bottom-0 z-20 flex flex-wrap justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 px-5 py-3 shadow-sm backdrop-blur">
+            <div class="enterprise-action-bar sticky bottom-0 z-20 rounded-xl backdrop-blur">
                 <a href="{{ route('warehouse-transfers.index') }}" class="rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Cancel</a>
                 <button name="action" value="draft" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">Save Draft</button>
                 <button name="action" value="post" data-post-transfer class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">Post Transfer</button>

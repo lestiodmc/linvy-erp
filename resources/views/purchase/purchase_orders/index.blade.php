@@ -5,7 +5,7 @@
             subtitle="Direct PO or converted from approved PR."
         >
             <x-slot:action>
-            <a href="{{ route('purchase-orders.create') }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">New Direct PO</a>
+            <a href="{{ route('purchase-orders.create') }}" class="enterprise-create theme-focus rounded-lg px-4 py-2 text-sm font-bold">New Direct PO</a>
             </x-slot:action>
         </x-ui.page-header>
     </x-slot>
@@ -59,7 +59,7 @@
             </x-slot:head>
 
             @forelse($records as $record)
-                <tr class="hover:bg-slate-50">
+                <tr>
                     <td class="px-5 py-4 font-bold text-slate-900">{{ $record->number }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->supplier?->name }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->branch?->name ?: '-' }}</td>
@@ -67,10 +67,10 @@
                     <td class="px-5 py-4 text-slate-600">{{ $record->order_date?->format('Y-m-d') }}</td>
                     <td class="px-5 py-4"><x-ui.status-badge :status="$record->status" /></td>
                     <td class="px-5 py-4 text-right font-semibold text-slate-900">{{ number_format($record->grand_total, 2) }}</td>
-                    <td class="px-5 py-4 text-right"><a href="{{ route('purchase-orders.show', $record) }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Open</a></td>
+                    <td class="px-5 py-4 text-right"><x-ui.table-action :href="route('purchase-orders.show', $record)" /></td>
                 </tr>
             @empty
-                <x-ui.empty-state colspan="8" message="No purchase orders yet." />
+                <x-ui.empty-state colspan="8" message="No purchase orders found." description="Try changing the filters or create a new purchase order." />
             @endforelse
         </x-ui.data-table>
 

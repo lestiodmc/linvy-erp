@@ -5,7 +5,7 @@
             subtitle="Move inventory between warehouses in the same branch."
         >
             <x-slot:action>
-                <a href="{{ route('warehouse-transfers.create') }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">New Transfer</a>
+                <a href="{{ route('warehouse-transfers.create') }}" class="enterprise-create theme-focus rounded-lg px-4 py-2 text-sm font-bold">New Transfer</a>
             </x-slot:action>
         </x-ui.page-header>
     </x-slot>
@@ -50,7 +50,7 @@
             </x-slot:head>
 
             @forelse($records as $record)
-                <tr class="text-xs hover:bg-slate-50">
+                <tr class="text-xs">
                     <td class="whitespace-nowrap px-3 py-2 font-bold text-slate-900">{{ $record->number ?: 'DRAFT' }}</td>
                     <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ $formatDate($record->transfer_date) }}</td>
                     <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ $record->company?->name ?: '-' }}</td>
@@ -67,11 +67,11 @@
                     <td class="whitespace-nowrap px-3 py-2"><x-ui.status-badge :status="$record->status" /></td>
                     <td class="whitespace-nowrap px-3 py-2 text-slate-500">-</td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
-                        <a href="{{ route('warehouse-transfers.show', $record) }}" class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Open</a>
+                        <x-ui.table-action :href="route('warehouse-transfers.show', $record)" />
                     </td>
                 </tr>
             @empty
-                <x-ui.empty-state colspan="10" message="No warehouse transfers found." />
+                <x-ui.empty-state colspan="10" message="No warehouse transfers found." description="No transfer documents match the selected filters." />
             @endforelse
         </x-ui.data-table>
 

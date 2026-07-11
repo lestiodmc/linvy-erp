@@ -5,7 +5,7 @@
             subtitle="Receive approved PO items into warehouse stock."
         >
             <x-slot:action>
-            <a href="{{ route('receivings.create') }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">New Receiving</a>
+            <a href="{{ route('receivings.create') }}" class="enterprise-create theme-focus rounded-lg px-4 py-2 text-sm font-bold">New Receiving</a>
             </x-slot:action>
         </x-ui.page-header>
     </x-slot>
@@ -59,7 +59,7 @@
             </x-slot:head>
 
             @forelse($records as $record)
-                <tr class="hover:bg-slate-50">
+                <tr>
                     <td class="px-5 py-4 font-bold text-slate-900">{{ $record->number }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->purchaseOrder?->number }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->supplier?->name }}</td>
@@ -67,10 +67,10 @@
                     <td class="px-5 py-4 text-slate-600">{{ $record->lines->map(fn ($line) => trim(($line->warehouse?->code ? $line->warehouse->code.' - ' : '').($line->warehouse?->name ?? '')))->filter()->unique()->values()->join(', ') ?: '-' }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->received_date?->format('Y-m-d') }}</td>
                     <td class="px-5 py-4"><x-ui.status-badge :status="$record->status" /></td>
-                    <td class="px-5 py-4 text-right"><a href="{{ route('receivings.show', $record) }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Open</a></td>
+                    <td class="px-5 py-4 text-right"><x-ui.table-action :href="route('receivings.show', $record)" /></td>
                 </tr>
             @empty
-                <x-ui.empty-state colspan="8" message="No receivings yet." />
+                <x-ui.empty-state colspan="8" message="No receivings found." description="No receiving documents match the selected filters." />
             @endforelse
         </x-ui.data-table>
 

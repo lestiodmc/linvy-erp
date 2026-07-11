@@ -364,18 +364,7 @@ class InventoryLedgerService
 
     private function movementLabel(StockMovement $movement): string
     {
-        if ($this->normalizedType($movement) === 'BATCH-ASSIGNMENT-IN') {
-            return 'Batch Assignment In';
-        }
-
-        if ($this->normalizedType($movement) === 'BATCH-ASSIGNMENT-OUT') {
-            return 'Batch Assignment Out';
-        }
-
-        return str($movement->transaction_type ?: $movement->movement_type ?: 'Reference')
-            ->replace(['_', '-'], ' ')
-            ->upper()
-            ->toString();
+        return StockMovement::typeLabel($movement->transaction_type ?: $movement->movement_type);
     }
 
     private function documentType(StockMovement $movement): string

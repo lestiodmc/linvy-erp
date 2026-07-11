@@ -70,7 +70,7 @@ class PurchaseOrderController extends Controller
     {
         abort_if($purchaseRequest->status !== PurchaseRequest::STATUS_APPROVED, 422, 'Only approved purchase requests can be converted to purchase orders.');
 
-        $purchaseRequest->load(['lines.item', 'lines.unit']);
+        $purchaseRequest->load(['requester', 'branch', 'lines.item', 'lines.unit']);
         $record = new PurchaseOrder([
             'purchase_request_id' => $purchaseRequest->id,
             'company_id' => $purchaseRequest->company_id,
@@ -152,7 +152,7 @@ class PurchaseOrderController extends Controller
     public function show(PurchaseOrder $record): View
     {
         return view('purchase.purchase_orders.show', [
-            'record' => $record->load(['supplier', 'purchaseRequest', 'lines.item', 'lines.unit', 'lines.purchaseRequestLine', 'approvalLogs.user']),
+            'record' => $record->load(['supplier', 'purchaseRequest.requester', 'purchaseRequest.branch', 'lines.item', 'lines.unit', 'lines.purchaseRequestLine', 'approvalLogs.user']),
         ]);
     }
 
@@ -160,7 +160,7 @@ class PurchaseOrderController extends Controller
     {
         abort_if($record->status !== PurchaseOrder::STATUS_DRAFT, 422, 'Only draft purchase orders can be edited.');
 
-        return $this->formView($record->load('lines'));
+        return $this->formView($record->load(['purchaseRequest.requester', 'purchaseRequest.branch', 'lines']));
     }
 
     public function update(Request $request, PurchaseOrder $record): RedirectResponse

@@ -27,6 +27,7 @@
                 results: [],
                 open: false,
                 loading: false,
+                activeIndex: -1,
                 searched: false,
                 selectingOption: false,
                 isDropdownMouseDown: false,
@@ -86,6 +87,7 @@
                         }));
                     }
                     clearTimeout(this.timer);
+                    this.activeIndex = -1;
 
                     if (this.query.trim().length < 2) {
                         this.results = [];
@@ -173,6 +175,15 @@
                     }, 150);
                 },
 
+                moveActive(step) {
+                    if (!this.open || this.results.length === 0) return;
+                    this.activeIndex = (this.activeIndex + step + this.results.length) % this.results.length;
+                },
+
+                selectActive() {
+                    if (this.activeIndex >= 0 && this.results[this.activeIndex]) this.select(this.results[this.activeIndex]);
+                },
+
                 clearIfBlank() {
                     setTimeout(() => {
                         if (this.selectingOption || this.isDropdownMouseDown) {
@@ -217,11 +228,18 @@
             @focus="if (query.trim().length >= 2) { positionDropdown(); open = true }"
             @blur="clearIfBlank()"
             @keydown.escape.prevent="open = false"
+            @keydown.arrow-down.prevent="moveActive(1)"
+            @keydown.arrow-up.prevent="moveActive(-1)"
+            @keydown.enter.prevent="selectActive()"
             placeholder="{{ $placeholder }}"
-            class="block {{ $inputClass }} rounded-lg border-slate-200 pr-9 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+            class="enterprise-form-control block {{ $inputClass }} pr-9"
+            role="combobox"
+            aria-autocomplete="list"
+            :aria-expanded="open"
+            aria-haspopup="listbox"
             {{ $attributes }}
         >
-        <span x-show="loading" class="absolute inset-y-0 right-3 flex items-center text-xs font-bold text-slate-400">...</span>
+        <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center theme-muted" aria-hidden="true"><svg x-show="!loading" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg><span x-show="loading" class="text-xs font-bold">...</span></span>
     </div>
 
     <div
@@ -229,7 +247,8 @@
         x-show="open"
         x-cloak
         :style="dropdownStyle"
-        class="overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-2xl ring-1 ring-slate-900/5"
+        class="theme-dropdown overflow-y-auto rounded-lg py-1 text-sm shadow-2xl"
+        role="listbox"
         @pointerdown.stop="isDropdownMouseDown = true"
         @mousedown.prevent.stop="isDropdownMouseDown = true"
         @mouseup.stop="setTimeout(() => isDropdownMouseDown = false, 150)"
@@ -248,7 +267,10 @@
         <template x-for="option in results" :key="option.id">
             <button
                 type="button"
-                class="block w-full px-3 py-2 text-left font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"
+                class="theme-option block w-full px-3 py-2 text-left font-semibold"
+                :class="activeIndex === results.indexOf(option) ? 'theme-primary-soft' : ''"
+                role="option"
+                :aria-selected="String(selectedId) === String(option.id)"
                 @pointerdown.prevent.stop="select(option)"
                 @mousedown.prevent.stop
                 @click.prevent.stop

@@ -1,0 +1,2 @@
+@props(['title' => 'Item Lines', 'count' => null])
+<section {{ $attributes->class('enterprise-line-items theme-card overflow-visible rounded-lg') }}><div class="flex items-center justify-between gap-3 border-b px-4 py-3" style="border-color:var(--theme-border)"><h2 class="text-sm font-black">{{ $title }}</h2>@if($count !== null)<span class="text-xs theme-muted">{{ $count }} line items</span>@endif @isset($toolbar){{ $toolbar }}@endisset</div><div class="max-w-full overflow-x-auto">{{ $slot }}</div></section>

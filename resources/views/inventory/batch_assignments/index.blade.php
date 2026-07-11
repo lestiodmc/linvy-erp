@@ -33,9 +33,9 @@
                 });
             });
         </script>
-        <div class="mb-2 text-right"><a href="{{ route('batch-assignments.create') }}" class="inline-flex h-9 items-center rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white">New Assignment</a></div>
+        <div class="mb-2 text-right"><a href="{{ route('batch-assignments.create') }}" class="enterprise-create theme-focus inline-flex h-9 items-center rounded-lg px-3 text-sm font-bold">New Assignment</a></div>
         <x-ui.data-table><x-slot:head><tr>@foreach(['Number','Date','Branch','Warehouse','Items','Status','Created By','Action'] as $h)<th class="px-3 py-2 text-left text-[11px] font-black uppercase text-slate-500">{{ $h }}</th>@endforeach</tr></x-slot:head>
-        @forelse($records as $record)<tr class="text-xs"><td class="px-3 py-2 font-bold">{{ $record->number }}</td><td class="px-3 py-2">{{ $record->assignment_date?->format('d M Y') }}</td><td class="px-3 py-2">{{ $record->branch?->name }}</td><td class="px-3 py-2">{{ $record->warehouse?->name }}</td><td class="px-3 py-2">{{ $record->lines_count }}</td><td class="px-3 py-2"><x-ui.status-badge :status="$record->status" /></td><td class="px-3 py-2">{{ $record->createdBy?->name ?: '-' }}</td><td class="px-3 py-2"><a class="font-bold text-emerald-700" href="{{ route('batch-assignments.show',$record) }}">Open</a></td></tr>@empty<x-ui.empty-state colspan="8" message="No batch assignments found." />@endforelse
+        @forelse($records as $record)<tr class="text-xs"><td class="px-3 py-2 font-bold">{{ $record->number }}</td><td class="px-3 py-2">{{ $record->assignment_date?->format('d M Y') }}</td><td class="px-3 py-2">{{ $record->branch?->name }}</td><td class="px-3 py-2">{{ $record->warehouse?->name }}</td><td class="px-3 py-2 text-right tabular-nums">{{ $record->lines_count }}</td><td class="px-3 py-2"><x-ui.status-badge :status="$record->status" /></td><td class="px-3 py-2">{{ $record->createdBy?->name ?: '-' }}</td><td class="px-3 py-2 text-right"><x-ui.table-action :href="route('batch-assignments.show', $record)" /></td></tr>@empty<x-ui.empty-state colspan="8" message="No batch assignments found." description="No batch assignment documents match the selected filters." />@endforelse
         </x-ui.data-table><x-ui.pagination :records="$records" />
     </div>
 </x-app-layout>

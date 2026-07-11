@@ -2,14 +2,21 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Models\BatchAssignment;
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\ItemCategory;
+use App\Models\Item;
+use App\Models\Receiving;
+use App\Models\StockAdjustment;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
+use App\Models\WarehouseTransfer;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use App\Support\InventoryMovementSource;
 
 class StockMovementController extends ResourceController
 {
@@ -23,112 +30,73 @@ class StockMovementController extends ResourceController
 
     public function index(): View
     {
-        $filters = $this->filters();
-
-        $records = StockMovement::query()
-            ->accessibleFromBranches($this->accessibleBranches()->pluck('id')->map(fn ($id) => (int) $id)->all())
-            ->with(['company', 'branch', 'warehouse.branch', 'warehouse.company', 'item.category', 'item.baseUnit', 'uom'])
-            ->when(filled($filters['keyword'] ?? null), function ($query) use ($filters): void {
-                $keyword = $filters['keyword'];
-
-                $query->where(function ($search) use ($keyword): void {
-                    $search->where('reference_number', 'like', '%'.$keyword.'%')
-                        ->orWhere('transaction_number', 'like', '%'.$keyword.'%')
-                        ->orWhereHas('item', fn ($item) => $item
-                            ->where('sku', 'like', '%'.$keyword.'%')
-                            ->orWhere('name', 'like', '%'.$keyword.'%'))
-                        ->orWhereHas('warehouse', fn ($warehouse) => $warehouse->where('name', 'like', '%'.$keyword.'%'));
-                });
-            })
-            ->when(filled($filters['date_from'] ?? null), fn ($query) => $query->where(function ($dateQuery) use ($filters): void {
-                $dateQuery->whereDate('transaction_date', '>=', $filters['date_from'])
-                    ->orWhereDate('movement_date', '>=', $filters['date_from']);
-            }))
-            ->when(filled($filters['date_to'] ?? null), fn ($query) => $query->where(function ($dateQuery) use ($filters): void {
-                $dateQuery->whereDate('transaction_date', '<=', $filters['date_to'])
-                    ->orWhereDate('movement_date', '<=', $filters['date_to']);
-            }))
-            ->when(filled($filters['company_id'] ?? null), fn ($query) => $query->forCompany((int) $filters['company_id']))
-            ->when(filled($filters['branch_id'] ?? null), fn ($query) => $query->forBranch((int) $filters['branch_id']))
-            ->when(filled($filters['warehouse_id'] ?? null), fn ($query) => $query->where('warehouse_id', $filters['warehouse_id']))
-            ->when(filled($filters['movement_type'] ?? null), function ($query) use ($filters): void {
-                $query->where(function ($movementQuery) use ($filters): void {
-                    $movementQuery->where('movement_type', $filters['movement_type'])
-                        ->orWhere('transaction_type', $filters['movement_type']);
-                });
-            })
-            ->when(filled($filters['item_category_id'] ?? null), fn ($query) => $query->whereHas('item', fn ($item) => $item->where('item_category_id', $filters['item_category_id'])))
-            ->orderByRaw('COALESCE(transaction_date, movement_date) DESC')
-            ->orderByDesc('id')
-            ->paginate(15)
-            ->withQueryString();
+        $branches = $this->accessibleBranches();
+        $filters = $this->filters($branches);
+        $query = $this->filteredQuery($filters, $branches);
+        $summary = $this->summary(clone $query, $filters);
+        $records = $query->with(['company', 'branch', 'warehouse.branch', 'warehouse.company', 'item.category', 'item.baseUnit', 'uom', 'baseUom'])
+            ->orderByRaw('COALESCE(transaction_date, movement_date) DESC')->orderByDesc('id')->paginate(15)->withQueryString();
 
         return view('inventory.stock_movements.index', [
-            'records' => $records,
-            'filters' => $filters,
-            'companies' => Company::whereIn('id', $this->accessibleBranches()->pluck('company_id'))->orderBy('name')->pluck('name', 'id')->all(),
-            'branches' => $this->accessibleBranches()->pluck('name', 'id')->all(),
-            'warehouses' => $this->warehouseRecords(),
-            'movementTypes' => $this->movementTypes(),
-            'itemCategories' => ItemCategory::orderBy('name')->pluck('name', 'id')->all(),
+            'records' => $records, 'filters' => $filters, 'summary' => $summary, 'sourceLinks' => InventoryMovementSource::links($records->getCollection()),
+            'companies' => Company::query()->whereIn('id', $branches->pluck('company_id'))->orderBy('name')->get(),
+            'branches' => filled($filters['company_id'] ?? null) ? $branches->where('company_id', (int) $filters['company_id'])->values() : $branches,
+            'warehouses' => $this->warehouses($branches, $filters['company_id'] ?? null, $filters['branch_id'] ?? null),
+            'items' => $this->itemOptions($branches), 'batches' => $this->batchOptions($filters, $branches),
+            'movementTypes' => StockMovement::transactionTypeLabels(), 'directions' => ['IN' => 'IN', 'OUT' => 'OUT'],
         ]);
     }
 
-    private function filters(): array
+    public function branchOptions(): JsonResponse
     {
-        $request = request();
-        $filters = $request->only(['keyword', 'date_from', 'date_to', 'company_id', 'branch_id', 'warehouse_id', 'movement_type', 'item_category_id']);
+        $companyId = (int) request()->validate(['company_id' => ['required', 'exists:companies,id']])['company_id'];
+        $rows = $this->accessibleBranches()->where('company_id', $companyId)->values(); abort_if($rows->isEmpty(), 403);
+        return response()->json($rows->map(fn (Branch $branch) => ['id' => $branch->id, 'name' => $branch->name]));
+    }
 
-        if (! $request->has('date_from')) {
-            $filters['date_from'] = now()->startOfMonth()->toDateString();
-        }
+    public function warehouseOptions(): JsonResponse
+    {
+        $data = request()->validate(['company_id' => ['nullable', 'exists:companies,id'], 'branch_id' => ['required', 'exists:branches,id']]);
+        $branch = $this->accessibleBranches()->firstWhere('id', (int) $data['branch_id']); abort_unless($branch && (! filled($data['company_id'] ?? null) || (int) $branch->company_id === (int) $data['company_id']), 403);
+        return response()->json($this->warehouses($this->accessibleBranches(), $branch->company_id, $branch->id)->map(fn (Warehouse $warehouse) => ['id' => $warehouse->id, 'label' => $branch->name.' - '.$warehouse->name]));
+    }
 
-        if (! $request->has('date_to')) {
-            $filters['date_to'] = now()->toDateString();
-        }
+    protected function query()
+    {
+        return StockMovement::query()->accessibleFromBranches($this->accessibleBranches()->pluck('id')->map(fn ($id) => (int) $id)->all())->with($this->with);
+    }
 
+    private function filteredQuery(array $filters, Collection $branches): Builder
+    {
+        return StockMovement::query()->accessibleFromBranches($branches->pluck('id')->map(fn ($id) => (int) $id)->all())
+            ->when(filled($filters['company_id'] ?? null), fn (Builder $query) => $query->forCompany((int) $filters['company_id']))
+            ->when(filled($filters['branch_id'] ?? null), fn (Builder $query) => $query->forBranch((int) $filters['branch_id']))
+            ->when(filled($filters['warehouse_id'] ?? null), fn (Builder $query) => $query->where('warehouse_id', $filters['warehouse_id']))
+            ->when(filled($filters['item_id'] ?? null), fn (Builder $query) => $query->where('item_id', $filters['item_id']))
+            ->when(($filters['batch_no'] ?? '__all') !== '__all', function (Builder $query) use ($filters): void { $filters['batch_no'] === '__no_batch' ? $query->where(fn (Builder $batch) => $batch->whereNull('batch_no')->orWhere('batch_no', '')) : $query->where('batch_no', $filters['batch_no']); })
+            ->when(filled($filters['transaction_type'] ?? null), fn (Builder $query) => $query->where(fn (Builder $type) => $type->where('transaction_type', $filters['transaction_type'])->orWhere('movement_type', $filters['transaction_type'])))
+            ->when(($filters['direction'] ?? '') === 'IN', fn (Builder $query) => $query->where('quantity_in', '>', 0)->where('quantity_out', '<=', 0))
+            ->when(($filters['direction'] ?? '') === 'OUT', fn (Builder $query) => $query->where('quantity_out', '>', 0)->where('quantity_in', '<=', 0))
+            ->when(filled($filters['reference'] ?? null), fn (Builder $query) => $query->where(fn (Builder $reference) => $reference->where('transaction_number', 'like', '%'.$filters['reference'].'%')->orWhere('reference_number', 'like', '%'.$filters['reference'].'%')))
+            ->when(filled($filters['keyword'] ?? null), function (Builder $query) use ($filters): void { $term = '%'.$filters['keyword'].'%'; $query->where(fn (Builder $search) => $search->where('transaction_number', 'like', $term)->orWhere('reference_number', 'like', $term)->orWhere('batch_no', 'like', $term)->orWhere('notes', 'like', $term)->orWhere('remarks', 'like', $term)->orWhereHas('item', fn (Builder $item) => $item->where('sku', 'like', $term)->orWhere('name', 'like', $term))); })
+            ->when(filled($filters['date_from'] ?? null), fn (Builder $query) => $query->where(fn (Builder $date) => $date->whereDate('transaction_date', '>=', $filters['date_from'])->orWhere(fn (Builder $legacy) => $legacy->whereNull('transaction_date')->whereDate('movement_date', '>=', $filters['date_from']))))
+            ->when(filled($filters['date_to'] ?? null), fn (Builder $query) => $query->where(fn (Builder $date) => $date->whereDate('transaction_date', '<=', $filters['date_to'])->orWhere(fn (Builder $legacy) => $legacy->whereNull('transaction_date')->whereDate('movement_date', '<=', $filters['date_to']))));
+    }
+
+    private function filters(Collection $branches): array
+    {
+        $filters = request()->only(['keyword', 'company_id', 'branch_id', 'warehouse_id', 'item_id', 'batch_no', 'transaction_type', 'direction', 'reference', 'date_from', 'date_to']);
+        $companyIds = $branches->pluck('company_id')->filter()->unique(); $companyId = filled($filters['company_id'] ?? null) && $companyIds->contains((int) $filters['company_id']) ? (int) $filters['company_id'] : null;
+        $branchId = filled($filters['branch_id'] ?? null) && $branches->contains(fn (Branch $branch) => (int) $branch->id === (int) $filters['branch_id'] && (! $companyId || (int) $branch->company_id === $companyId)) ? (int) $filters['branch_id'] : null;
+        $warehouse = filled($filters['warehouse_id'] ?? null) ? $this->warehouses($branches, $companyId, $branchId)->firstWhere('id', (int) $filters['warehouse_id']) : null;
+        $filters['company_id'] = $companyId; $filters['branch_id'] = $branchId; $filters['warehouse_id'] = $warehouse?->id; $filters['batch_no'] = filled($filters['batch_no'] ?? null) ? $filters['batch_no'] : '__all';
+        if (! request()->has('date_from')) $filters['date_from'] = now()->startOfMonth()->toDateString(); if (! request()->has('date_to')) $filters['date_to'] = now()->toDateString();
         return $filters;
     }
 
-    private function movementTypes(): array
-    {
-        return collect([
-            'RCV',
-            'IN',
-            'OUT',
-            'PURCHASE_RECEIVE',
-            'TRANSFER_IN',
-            'TRANSFER_OUT',
-            'TRF-IN',
-            'TRF-OUT',
-            'ADJUSTMENT_IN',
-            'ADJUSTMENT_OUT',
-            'ADJ-IN',
-            'ADJ-OUT',
-            'BATCH_ASSIGNMENT_IN',
-            'BATCH_ASSIGNMENT_OUT',
-            'DO',
-            'SERVICE',
-            'PRODUCTION_OUTPUT',
-            'PRODUCTION_INPUT',
-        ])->mapWithKeys(fn (string $type): array => [$type => str($type)->replace(['_', '-'], ' ')->title()])->all();
-    }
-
-    private function warehouseRecords()
-    {
-        return Warehouse::with('branch')
-            ->whereIn('branch_id', $this->accessibleBranches()->pluck('id'))
-            ->orderBy('branch_id')
-            ->orderBy('name')
-            ->get();
-    }
-
-    private function accessibleBranches()
-    {
-        return Branch::query()
-            ->where('is_active', true)
-            ->when(! Auth::user()?->isSuperAdmin(), fn (Builder $query) => $query->whereHas('users', fn (Builder $users) => $users->whereKey(Auth::id())))
-            ->orderBy('name')
-            ->get();
-    }
+    private function accessibleBranches(): Collection { return Branch::query()->with('company')->where('is_active', true)->when(! Auth::user()?->isSuperAdmin(), fn (Builder $query) => $query->whereHas('users', fn (Builder $users) => $users->whereKey(Auth::id())))->orderBy('name')->get(); }
+    private function warehouses(Collection $branches, mixed $companyId = null, mixed $branchId = null): Collection { return Warehouse::query()->with(['branch', 'company'])->where('is_active', true)->whereIn('branch_id', $branches->pluck('id'))->when(filled($branchId), fn (Builder $query) => $query->where('branch_id', $branchId))->when(filled($companyId), fn (Builder $query) => $query->where(fn (Builder $scope) => $scope->where('company_id', $companyId)->orWhere(fn (Builder $legacy) => $legacy->whereNull('company_id')->whereHas('branch', fn (Builder $branch) => $branch->where('company_id', $companyId)))))->orderBy('name')->get(); }
+    private function itemOptions(Collection $branches): Collection { $ids = StockMovement::query()->accessibleFromBranches($branches->pluck('id')->all())->select('item_id')->distinct()->limit(500)->pluck('item_id'); return Item::query()->whereIn('id', $ids)->orderBy('sku')->get(['id', 'sku', 'name'])->mapWithKeys(fn (Item $item) => [$item->id => trim($item->sku.' - '.$item->name)]); }
+    private function batchOptions(array $filters, Collection $branches): array { $query = StockMovement::query()->accessibleFromBranches($branches->pluck('id')->all())->when(filled($filters['company_id'] ?? null), fn (Builder $q) => $q->forCompany((int) $filters['company_id']))->when(filled($filters['branch_id'] ?? null), fn (Builder $q) => $q->forBranch((int) $filters['branch_id']))->when(filled($filters['warehouse_id'] ?? null), fn (Builder $q) => $q->where('warehouse_id', $filters['warehouse_id']))->when(filled($filters['item_id'] ?? null), fn (Builder $q) => $q->where('item_id', $filters['item_id'])); $options = ['__no_batch' => 'No Batch']; foreach ($query->whereNotNull('batch_no')->where('batch_no', '!=', '')->distinct()->orderBy('batch_no')->limit(500)->pluck('batch_no') as $batch) $options[$batch] = $batch; return $options; }
+    private function summary(Builder $query, array $filters): array { $totals = $query->selectRaw('COUNT(*) rows_count, COALESCE(SUM(quantity_in),0) total_in, COALESCE(SUM(quantity_out),0) total_out, SUM(CASE WHEN quantity_in > 0 AND quantity_out <= 0 THEN 1 ELSE 0 END) in_count, SUM(CASE WHEN quantity_out > 0 AND quantity_in <= 0 THEN 1 ELSE 0 END) out_count')->first(); $item = filled($filters['item_id'] ?? null) ? Item::with('baseUnit')->find($filters['item_id']) : null; return ['rows' => (int) $totals->rows_count, 'in' => (float) $totals->total_in, 'out' => (float) $totals->total_out, 'net' => (float) $totals->total_in - (float) $totals->total_out, 'in_count' => (int) $totals->in_count, 'out_count' => (int) $totals->out_count, 'uom' => $item?->baseUnit?->code, 'mixed' => ! $item]; }
 }

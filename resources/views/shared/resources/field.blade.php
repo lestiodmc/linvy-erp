@@ -25,7 +25,7 @@
         <label for="{{ $name }}" class="block text-sm font-bold text-slate-700">{{ $field['label'] }}</label>
 
         @if($type === 'select')
-            <select id="{{ $name }}" name="{{ $name }}" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-600">
+            <select id="{{ $name }}" name="{{ $name }}" class="enterprise-form-control mt-1 block w-full shadow-sm" @if($errors->has($name)) aria-invalid="true" aria-describedby="{{ $name }}-error" @endif>
                 @if($field['nullable'] ?? false)
                     <option value="">-</option>
                 @endif
@@ -34,13 +34,13 @@
                 @endforeach
             </select>
         @elseif($type === 'textarea')
-            <textarea id="{{ $name }}" name="{{ $name }}" rows="4" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-600">{{ $value }}</textarea>
+            <textarea id="{{ $name }}" name="{{ $name }}" rows="4" class="enterprise-form-control mt-1 block w-full shadow-sm" @if($errors->has($name)) aria-invalid="true" aria-describedby="{{ $name }}-error" @endif>{{ $value }}</textarea>
         @else
-            <input id="{{ $name }}" type="{{ $type }}" name="{{ $name }}" value="{{ $value }}" step="{{ $field['step'] ?? '' }}" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-600">
+            <input id="{{ $name }}" type="{{ $type }}" name="{{ $name }}" value="{{ $value }}" step="{{ $field['step'] ?? '' }}" class="enterprise-form-control mt-1 block w-full shadow-sm" @if($errors->has($name)) aria-invalid="true" aria-describedby="{{ $name }}-error" @endif>
         @endif
     @endif
 
     @error($name)
-        <p class="mt-1 text-sm font-medium text-red-600">{{ $message }}</p>
+        <p id="{{ $name }}-error" class="enterprise-form-error">{{ $message }}</p>
     @enderror
 </div>

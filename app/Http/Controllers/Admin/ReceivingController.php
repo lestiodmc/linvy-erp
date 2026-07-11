@@ -324,7 +324,7 @@ class ReceivingController extends Controller
             return [];
         }
 
-        $purchaseOrder = PurchaseOrder::with('supplier:id,name')->find($purchaseOrderId);
+        $purchaseOrder = PurchaseOrder::with(['supplier:id,name', 'branch:id,name'])->find($purchaseOrderId);
 
         if (! $purchaseOrder) {
             return [];
@@ -333,6 +333,12 @@ class ReceivingController extends Controller
         return [
             'id' => $purchaseOrder->id,
             'text' => trim($purchaseOrder->number.' - '.$purchaseOrder->supplier?->name),
+            'number' => $purchaseOrder->number,
+            'status' => $purchaseOrder->status,
+            'supplier' => $purchaseOrder->supplier?->name,
+            'branch' => $purchaseOrder->branch?->name,
+            'order_date' => $purchaseOrder->order_date?->format('d M Y'),
+            'expected_date' => $purchaseOrder->expected_date?->format('d M Y'),
         ];
     }
 

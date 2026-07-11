@@ -16,7 +16,7 @@
         id="{{ $name }}"
         name="{{ $name }}"
         aria-label="{{ $fieldLabel }}"
-        {{ $attributes->class('h-10 w-full rounded-lg border-slate-200 px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500') }}
+        {{ $attributes->class('theme-surface h-10 w-full rounded-lg border px-3 text-sm') }}
     >
         <option value="">{{ $allLabel }}</option>
         @foreach($options as $optionValue => $optionLabel)

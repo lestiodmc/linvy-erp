@@ -12,6 +12,6 @@
         name="{{ $name }}"
         value="{{ $value }}"
         placeholder="{{ $placeholder }}"
-        {{ $attributes->class('h-10 w-full rounded-lg border-slate-200 px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500') }}
+        {{ $attributes->class('theme-surface h-10 w-full rounded-lg border px-3 text-sm') }}
     >
 </div>

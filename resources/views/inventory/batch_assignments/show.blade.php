@@ -21,7 +21,7 @@
         ];
     @endphp
 
-    <div class="mx-auto max-w-screen-xl space-y-3">
+    <div class="enterprise-detail mx-auto max-w-screen-xl space-y-3">
         @if(session('status'))
             <div class="rounded-lg bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
                 {{ session('status') }}

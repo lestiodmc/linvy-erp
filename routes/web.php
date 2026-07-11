@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeliveryOrderController;
 use App\Http\Controllers\Admin\DocumentSequenceController;
 use App\Http\Controllers\Admin\ItemLedgerController;
+use App\Http\Controllers\Admin\InventoryDashboardController;
 use App\Http\Controllers\Admin\ItemCategoryController;
 use App\Http\Controllers\Admin\ItemController;
 use App\Http\Controllers\Admin\ModuleSettingController;
@@ -89,11 +90,14 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('module:inventory')->group(function () {
+        Route::get('inventory/dashboard', InventoryDashboardController::class)->name('inventory.dashboard');
         Route::get('inventory/item-ledger', [ItemLedgerController::class, 'index'])->name('item-ledger.index');
         Route::get('inventory/item-ledger/export-excel', [ItemLedgerController::class, 'exportExcel'])->name('item-ledger.export-excel');
         Route::get('inventory/item-ledger/export-pdf', [ItemLedgerController::class, 'exportPdf'])->name('item-ledger.export-pdf');
         Route::get('inventory/stock-adjustments/current-stock', [StockAdjustmentController::class, 'currentStock']);
         Route::get('inventory/stock-adjustments/item-info', [StockAdjustmentController::class, 'itemInfo'])->name('inventory.stock-adjustments.item-info');
+        Route::get('stock-movements/branches', [StockMovementController::class, 'branchOptions'])->name('stock-movements.branches');
+        Route::get('stock-movements/warehouses', [StockMovementController::class, 'warehouseOptions'])->name('stock-movements.warehouses');
         Route::resource('stock-movements', StockMovementController::class)->only(['index', 'show'])->parameters(['stock-movements' => 'record']);
         Route::get('stock-balances/{record}/batches', [StockBalanceController::class, 'batches'])->name('stock-balances.batches');
         Route::get('batch-assignments/eligible-items', [BatchAssignmentController::class, 'eligibleItems'])->name('batch-assignments.eligible-items');

@@ -39,7 +39,7 @@
             ->sum(fn ($movement) => (float) $movement->qty);
     @endphp
 
-    <div class="mx-auto max-w-screen-2xl space-y-4">
+    <div class="enterprise-detail mx-auto max-w-screen-2xl space-y-4">
         @include('purchase.shared.flash')
 
         <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

@@ -5,7 +5,7 @@
             subtitle="Count physical stock and post differences through inventory movements."
         >
             <x-slot:action>
-                <a href="{{ route('stock-adjustments.create') }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">New Adjustment</a>
+                <a href="{{ route('stock-adjustments.create') }}" class="enterprise-create theme-focus rounded-lg px-4 py-2 text-sm font-bold">New Adjustment</a>
             </x-slot:action>
         </x-ui.page-header>
     </x-slot>
@@ -50,7 +50,7 @@
 
             @forelse($records as $record)
                 @php($reasonLabel = $reasonCodes[$record->reason_code] ?? str($record->reason_code ?: $record->reason ?: '-')->replace('_', ' ')->title()->toString())
-                <tr class="hover:bg-slate-50">
+                <tr>
                     <td class="px-5 py-4 font-bold text-slate-900">{{ $record->number }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->adjustment_date?->format('Y-m-d') }}</td>
                     <td class="px-5 py-4 text-slate-600">
@@ -64,10 +64,10 @@
                     <td class="px-5 py-4 text-right font-semibold text-slate-700">{{ $record->lines_count }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->createdBy?->name ?: '-' }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->posted_at?->format('Y-m-d H:i') ?: '-' }}</td>
-                    <td class="px-5 py-4 text-right"><a href="{{ route('stock-adjustments.show', $record) }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Open</a></td>
+                    <td class="px-5 py-4 text-right"><x-ui.table-action :href="route('stock-adjustments.show', $record)" /></td>
                 </tr>
             @empty
-                <x-ui.empty-state colspan="9" message="No stock adjustments yet." />
+                <x-ui.empty-state colspan="9" message="No stock adjustments found." description="No adjustment documents match the selected filters." />
             @endforelse
         </x-ui.data-table>
 

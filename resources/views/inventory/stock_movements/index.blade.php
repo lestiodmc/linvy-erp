@@ -1,132 +1,42 @@
 <x-app-layout>
-    <x-slot name="header">
-        <x-ui.page-header
-            title="Stock Movements"
-            subtitle="Inventory audit trail by item, warehouse, and source document."
-        />
-    </x-slot>
-
+    <x-slot name="header"><x-ui.page-header title="Stock Movements" subtitle="Immutable inventory audit trail by item, warehouse, batch, and source document." /></x-slot>
     @php
-        $movementDate = fn ($record) => $record->transaction_date ?: $record->movement_date;
-        $movementLabel = fn ($record) => $record->transaction_type ?: $record->movement_type;
-        $formatDate = fn ($date) => $date ? \Illuminate\Support\Carbon::parse($date)->format('d M Y') : '-';
-        $formatQty = fn ($value) => number_format((float) $value, 2);
-        $badge = 'inline-flex max-w-36 truncate rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 bg-slate-100 text-slate-700 ring-slate-200';
-        $cell = 'px-3 py-2';
-        $headCell = 'px-3 py-2 text-left text-[11px] font-black uppercase tracking-wide text-slate-500';
-        $qtyIn = function ($record): float {
-            $legacyQty = (float) ($record->quantity_in ?? 0);
-            if ($legacyQty > 0) {
-                return $legacyQty;
-            }
-
-            $type = strtoupper(str_replace('_', '-', (string) ($record->transaction_type ?: $record->movement_type)));
-
-            return in_array($type, ['IN', 'RCV', 'PURCHASE-RECEIVE', 'ADJ-IN', 'ADJUSTMENT-IN', 'TRF-IN', 'TRANSFER-IN', 'RETURN-IN', 'PRODUCTION-OUTPUT'], true)
-                ? (float) ($record->base_qty ?: $record->qty)
-                : 0;
-        };
-        $qtyOut = function ($record): float {
-            $legacyQty = (float) ($record->quantity_out ?? 0);
-            if ($legacyQty > 0) {
-                return $legacyQty;
-            }
-
-            $type = strtoupper(str_replace('_', '-', (string) ($record->transaction_type ?: $record->movement_type)));
-
-            return in_array($type, ['OUT', 'DO', 'SALE-DELIVERY', 'ADJ-OUT', 'ADJUSTMENT-OUT', 'TRF-OUT', 'TRANSFER-OUT', 'RETURN-OUT', 'SERVICE', 'PRODUCTION-INPUT'], true)
-                ? (float) ($record->base_qty ?: $record->qty)
-                : 0;
-        };
-        $referenceUrl = function ($record): ?string {
-            $type = strtoupper(str_replace('_', '-', (string) ($record->transaction_type ?: $record->movement_type)));
-            $transactionId = $record->transaction_id;
-
-            $routeName = match ($type) {
-                'RCV', 'PURCHASE-RECEIVE' => 'receivings.show',
-                'ADJ-IN', 'ADJ-OUT', 'ADJUSTMENT-IN', 'ADJUSTMENT-OUT' => 'stock-adjustments.show',
-                'TRF-IN', 'TRF-OUT', 'TRANSFER-IN', 'TRANSFER-OUT' => 'warehouse-transfers.show',
-                default => null,
-            };
-
-            return $routeName && $transactionId && \Illuminate\Support\Facades\Route::has($routeName)
-                ? route($routeName, $transactionId)
-                : null;
-        };
+        $qty = fn ($value) => number_format((float) $value, 2);
+        $dateTime = fn ($value) => $value ? \Illuminate\Support\Carbon::parse($value)->format('d M Y H:i') : '-';
+        $date = fn ($value) => $value ? \Illuminate\Support\Carbon::parse($value)->format('d M Y') : '-';
+        $cell = 'px-3 py-2'; $head = 'px-3 py-2 text-left text-[11px] font-black uppercase tracking-wide text-slate-500';
+        $summarySuffix = $summary['mixed'] ? ' mixed UOM' : ($summary['uom'] ? ' '.$summary['uom'] : '');
     @endphp
-
     <div class="mx-auto max-w-screen-2xl">
-        <x-ui.filter-toolbar
-            :action="route('stock-movements.index')"
-            columns="lg:grid-cols-[minmax(13rem,1.4fr)_9rem_9rem_minmax(9rem,1fr)_minmax(9rem,1fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_7rem_6rem]"
-        >
+        <x-ui.filter-toolbar :action="route('stock-movements.index')" columns="lg:grid-cols-[minmax(13rem,1.4fr)_10rem_10rem_12rem_minmax(14rem,1.3fr)_10rem_11rem_8rem_12rem_9rem_9rem_7rem_6rem]" data-movement-filters>
             <x-ui.search-input :value="$filters['keyword'] ?? ''" />
+            <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies->pluck('name','id')" all-label="All companies" data-company />
+            <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches->pluck('name','id')" all-label="All branches" data-branch />
+            <div><label class="sr-only" for="warehouse_id">Warehouse</label><select id="warehouse_id" name="warehouse_id" data-warehouse class="h-10 w-full rounded-lg border-slate-200 text-sm"><option value="">All warehouses</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse->id }}" @selected((string)($filters['warehouse_id']??'')===(string)$warehouse->id)>{{ $warehouse->branch?->name }} - {{ $warehouse->name }}</option>@endforeach</select></div>
+            <x-ui.select-filter name="item_id" label="Item" :value="$filters['item_id'] ?? ''" :options="$items" all-label="All items" />
+            <x-ui.select-filter name="batch_no" label="Batch" :value="$filters['batch_no'] ?? '__all'" :options="$batches" all-label="All Batch" />
+            <x-ui.select-filter name="transaction_type" label="Transaction Type" :value="$filters['transaction_type'] ?? ''" :options="$movementTypes" all-label="All types" />
+            <x-ui.select-filter name="direction" label="Direction" :value="$filters['direction'] ?? ''" :options="$directions" all-label="All directions" />
+            <div><label class="sr-only" for="reference">Reference / Document No</label><input id="reference" name="reference" value="{{ $filters['reference'] ?? '' }}" placeholder="Document / reference" class="h-10 w-full rounded-lg border-slate-200 px-3 text-sm"></div>
             <x-ui.date-range :from="$filters['date_from'] ?? ''" :to="$filters['date_to'] ?? ''" />
-            <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies" all-label="All companies" />
-            <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches" all-label="All branches" />
-            <x-ui.warehouse-filter :warehouses="$warehouses" :value="$filters['warehouse_id'] ?? ''" />
-            <x-ui.select-filter name="movement_type" label="Movement Type" :value="$filters['movement_type'] ?? ''" :options="$movementTypes" all-label="All movements" />
-            <x-ui.select-filter name="item_category_id" label="Item Category" :value="$filters['item_category_id'] ?? ''" :options="$itemCategories" all-label="All categories" />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Apply</button>
-            <a href="{{ route('stock-movements.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Reset</a>
+            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white">Apply</button><a href="{{ route('stock-movements.index') }}" class="flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-bold">Reset</a>
         </x-ui.filter-toolbar>
-
-        <x-ui.data-table class="rounded-lg shadow-none">
-            <x-slot:head>
-                <tr>
-                    <th class="{{ $headCell }} whitespace-nowrap">Movement Date</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">SKU</th>
-                    <th class="{{ $headCell }} min-w-56">Item</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Company</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Branch</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Warehouse</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Batch</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Expiry</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Movement Type</th>
-                    <th class="{{ $headCell }} whitespace-nowrap text-right">Qty In</th>
-                    <th class="{{ $headCell }} whitespace-nowrap text-right">Qty Out</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">UoM</th>
-                    <th class="{{ $headCell }} min-w-40 whitespace-nowrap">Reference</th>
-                    <th class="{{ $headCell }} whitespace-nowrap text-right">Action</th>
-                </tr>
-            </x-slot:head>
-
-            @forelse($records as $record)
-                @php
-                    $inQty = $qtyIn($record);
-                    $outQty = $qtyOut($record);
-                    $reference = $record->transaction_number ?: $record->reference_number ?: '-';
-                    $sourceUrl = $referenceUrl($record);
-                @endphp
-                <tr class="text-xs hover:bg-slate-50">
-                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $formatDate($movementDate($record)) }}</td>
-                    <td class="{{ $cell }} whitespace-nowrap font-bold text-slate-900">{{ $record->item?->sku ?: '-' }}</td>
-                    <td class="{{ $cell }} min-w-56 max-w-80 truncate text-slate-700">{{ $record->item?->name ?: '-' }}</td>
-                    <td class="{{ $cell }} whitespace-nowrap"><span class="{{ $badge }}">{{ $record->company?->name ?: $record->warehouse?->company?->name ?: '-' }}</span></td>
-                    <td class="{{ $cell }} whitespace-nowrap"><span class="{{ $badge }}">{{ $record->branch?->name ?: $record->warehouse?->branch?->name ?: '-' }}</span></td>
-                    <td class="{{ $cell }} whitespace-nowrap"><span class="{{ $badge }}">{{ $record->warehouse?->name ?: '-' }}</span></td>
-                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ filled($record->batch_no) ? $record->batch_no : 'No Batch' }}</td>
-                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $formatDate($record->expiry_date) }}</td>
-                    <td class="{{ $cell }} whitespace-nowrap"><x-ui.movement-type-badge :type="$movementLabel($record)" /></td>
-                    <td class="{{ $cell }} whitespace-nowrap text-right font-semibold {{ $inQty > 0 ? 'text-emerald-700' : 'text-slate-400' }}">{{ $formatQty($inQty) }}</td>
-                    <td class="{{ $cell }} whitespace-nowrap text-right font-semibold {{ $outQty > 0 ? 'text-red-700' : 'text-slate-400' }}">{{ $formatQty($outQty) }}</td>
-                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $record->uom?->code ?: $record->item?->baseUnit?->code ?: '-' }}</td>
-                    <td class="{{ $cell }} min-w-40 whitespace-nowrap">
-                        @if($sourceUrl)
-                            <a href="{{ $sourceUrl }}" class="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline">{{ $reference }}</a>
-                        @else
-                            <span class="text-slate-600">{{ $reference }}</span>
-                        @endif
-                    </td>
-                    <td class="{{ $cell }} whitespace-nowrap text-right">
-                        <a href="{{ route('stock-movements.show', $record) }}" class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Open</a>
-                    </td>
-                </tr>
-            @empty
-                <x-ui.empty-state colspan="14" message="No stock movements found." />
-            @endforelse
-        </x-ui.data-table>
-
-        <x-ui.pagination :records="$records" />
+        <div class="mb-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Movement Rows</p><p class="text-lg font-black">{{ number_format($summary['rows']) }}</p><p class="text-[11px] text-slate-500">IN {{ $summary['in_count'] }} · OUT {{ $summary['out_count'] }}</p></div>
+            <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Total In</p><p class="text-lg font-black text-emerald-700">{{ $qty($summary['in']) }}</p><p class="text-[11px] text-slate-500">{{ trim($summarySuffix) ?: '-' }}</p></div>
+            <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Total Out</p><p class="text-lg font-black text-red-700">{{ $qty($summary['out']) }}</p><p class="text-[11px] text-slate-500">{{ trim($summarySuffix) ?: '-' }}</p></div>
+            <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Net Movement</p><p class="text-lg font-black {{ $summary['net'] < 0 ? 'text-red-700' : 'text-slate-900' }}">{{ $qty($summary['net']) }}</p><p class="text-[11px] text-slate-500">{{ trim($summarySuffix) ?: '-' }}</p></div>
+        </div>
+        <x-ui.data-table class="rounded-lg shadow-none"><x-slot:head><tr>@foreach(['Date / Time','Document No','Transaction Type','Direction','Company','Branch','Warehouse','SKU','Item Name','Batch','Expiry','Qty In','Qty Out','UOM','Reference Type','Notes','Action'] as $label)<th class="{{ $head }} whitespace-nowrap {{ in_array($label,['Qty In','Qty Out'])?'text-right':'' }}">{{ $label }}</th>@endforeach</tr></x-slot:head>
+        @forelse($records as $record)
+            @php($direction = $record->direction())
+            @php($documentNo = $record->transaction_number ?: $record->reference_number ?: '-')
+            @php($hasMappedSource = array_key_exists($record->id, $sourceLinks))
+            @php($sourceUrl = $sourceLinks[$record->id] ?? null)
+            @php($ledgerQuery = ['item_id'=>$record->item_id,'warehouse_id'=>$record->warehouse_id,'company_id'=>$record->company_id,'branch_id'=>$record->branch_id,'batch_no'=>filled($record->batch_no)?$record->batch_no:'__no_batch'])
+            <tr class="text-xs"><td class="{{ $cell }} whitespace-nowrap">{{ $dateTime($record->movement_date ?: $record->transaction_date ?: $record->created_at) }}</td><td class="{{ $cell }} whitespace-nowrap font-bold">@if($sourceUrl)<a href="{{ $sourceUrl }}" class="theme-link hover:underline">{{ $documentNo }}</a>@else{{ $documentNo }}@endif</td><td class="{{ $cell }}"><x-ui.movement-type-badge :type="$record->transaction_type ?: $record->movement_type" /></td><td class="{{ $cell }}"><x-ui.status-badge :status="$direction" /></td><td class="{{ $cell }} whitespace-nowrap">{{ $record->company?->name ?: $record->warehouse?->company?->name ?: '-' }}</td><td class="{{ $cell }} whitespace-nowrap">{{ $record->branch?->name ?: $record->warehouse?->branch?->name ?: '-' }}</td><td class="{{ $cell }} whitespace-nowrap font-semibold">{{ $record->warehouse?->name ?: '-' }}</td><td class="{{ $cell }} font-bold">{{ $record->item?->sku ?: '-' }}</td><td class="{{ $cell }} max-w-52 truncate">{{ $record->item?->name ?: '-' }}</td><td class="{{ $cell }} whitespace-nowrap">{{ filled($record->batch_no)?$record->batch_no:'No Batch' }}</td><td class="{{ $cell }} whitespace-nowrap">{{ $date($record->expiry_date) }}</td><td class="{{ $cell }} text-right font-bold text-emerald-700 tabular-nums">{{ $qty($record->quantityIn()) }}</td><td class="{{ $cell }} text-right font-bold text-red-700 tabular-nums">{{ $qty($record->quantityOut()) }}</td><td class="{{ $cell }} text-center">{{ $record->baseUom?->code ?: $record->uom?->code ?: $record->item?->baseUnit?->code ?: '-' }}</td><td class="{{ $cell }} max-w-44 truncate" title="{{ $record->reference_type }}">{{ $record->reference_type ? class_basename($record->reference_type) : '-' }}</td><td class="{{ $cell }} max-w-56 truncate" title="{{ $record->remarks ?: $record->notes }}">{{ $record->remarks ?: $record->notes ?: '-' }}</td><td class="{{ $cell }} whitespace-nowrap text-right"><x-ui.table-action :href="route('item-ledger.index', $ledgerQuery)" label="Ledger" />@if($hasMappedSource && !$sourceUrl)<span class="ml-2 text-slate-400">Source unavailable</span>@elseif(!$hasMappedSource)<span class="ml-2 text-slate-400">No source link</span>@endif</td></tr>
+        @empty<x-ui.empty-state colspan="17" message="No stock movements found." description="No inventory activity matches the selected filters." />@endforelse
+        </x-ui.data-table><x-ui.pagination :records="$records" />
     </div>
+    <script>document.addEventListener('DOMContentLoaded',()=>{const form=document.querySelector('[data-movement-filters]'),company=form.querySelector('[data-company]'),branch=form.querySelector('[data-branch]'),warehouse=form.querySelector('[data-warehouse]');company.addEventListener('change',async()=>{branch.innerHTML='<option value="">All branches</option>';warehouse.innerHTML='<option value="">All warehouses</option>';if(!company.value)return;const response=await fetch(`{{ route('stock-movements.branches') }}?company_id=${company.value}`);if(response.ok)(await response.json()).forEach(row=>branch.add(new Option(row.name,row.id)))});branch.addEventListener('change',async()=>{warehouse.innerHTML='<option value="">All warehouses</option>';if(!branch.value)return;const cq=company.value?`&company_id=${company.value}`:'';const response=await fetch(`{{ route('stock-movements.warehouses') }}?branch_id=${branch.value}${cq}`);if(response.ok)(await response.json()).forEach(row=>warehouse.add(new Option(row.label,row.id)))})})</script>
 </x-app-layout>

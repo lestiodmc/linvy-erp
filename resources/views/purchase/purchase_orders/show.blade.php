@@ -49,15 +49,29 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto max-w-screen-2xl">
+    <div class="mx-auto max-w-screen-2xl space-y-3">
         @include('purchase.shared.flash')
+        @if($record->purchaseRequest)
+            <x-source-document-summary
+                type="Purchase Request"
+                :number="$record->purchaseRequest->number"
+                :status="$record->purchaseRequest->status"
+                :subtitle="$record->purchaseRequest->requester?->name ?: $record->purchaseRequest->department"
+                :metadata="[
+                    ['label' => 'Branch', 'value' => $record->purchaseRequest->branch?->name],
+                    ['label' => 'Request Date', 'value' => $record->purchaseRequest->request_date?->format('d M Y')],
+                    ['label' => 'Department', 'value' => $record->purchaseRequest->department],
+                ]"
+                :action-url="Auth::user()?->canAccessModule('purchase') && \App\Support\ModuleManager::enabled('purchase') ? route('purchase-requests.show', $record->purchaseRequest) : null"
+                action-label="View PR"
+            />
+        @endif
         <div class="grid gap-4 lg:grid-cols-3">
             <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h3 class="text-base font-black text-slate-950">Header</h3>
                 <dl class="mt-4 space-y-3 text-sm">
                     <div><dt class="font-bold text-slate-500">Status</dt><dd><x-status-badge :status="$record->status" /></dd></div>
                     <div><dt class="font-bold text-slate-500">Supplier</dt><dd class="font-semibold text-slate-900">{{ $record->supplier?->name }}</dd></div>
-                    <div><dt class="font-bold text-slate-500">PR</dt><dd class="font-semibold text-slate-900">{{ $record->purchaseRequest?->number ?: '-' }}</dd></div>
                     <div><dt class="font-bold text-slate-500">Order Date</dt><dd class="font-semibold text-slate-900">{{ $record->order_date?->format('Y-m-d') }}</dd></div>
                     <div><dt class="font-bold text-slate-500">Expected Date</dt><dd class="font-semibold text-slate-900">{{ $record->expected_date?->format('Y-m-d') ?: '-' }}</dd></div>
                     <div><dt class="font-bold text-slate-500">Notes</dt><dd class="text-slate-700">{{ $record->notes ?: '-' }}</dd></div>

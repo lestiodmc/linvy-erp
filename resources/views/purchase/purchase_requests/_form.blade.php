@@ -28,7 +28,7 @@
                 }
             }"
             @submit="prepareSubmit()"
-            class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+            class="enterprise-form overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
         >
             @csrf
             @if($method !== 'POST')
@@ -107,7 +107,7 @@
                 </div>
             </div>
 
-            <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+            <div class="enterprise-action-bar sticky bottom-0 z-20">
                 <a href="{{ route('purchase-requests.index') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</a>
                 <button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Save Draft</button>
             </div>

@@ -45,7 +45,7 @@
         };
     @endphp
 
-    <div class="mx-auto max-w-screen-2xl">
+    <div class="enterprise-detail mx-auto max-w-screen-2xl">
         @include('purchase.shared.flash')
 
         <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">

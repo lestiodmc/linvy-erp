@@ -3,17 +3,11 @@
 @php
     $normalized = strtoupper(str_replace('_', '-', (string) $type));
 
-    [$label, $classes] = match ($normalized) {
-        'IN', 'RCV', 'PURCHASE-RECEIVE' => ['Purchase Receive', 'bg-emerald-50 text-emerald-700 ring-emerald-100'],
-        'TRF-IN', 'TRANSFER-IN' => ['Transfer In', 'bg-blue-50 text-blue-700 ring-blue-100'],
-        'TRF-OUT', 'TRANSFER-OUT' => ['Transfer Out', 'bg-amber-50 text-amber-700 ring-amber-100'],
-        'ADJ-IN', 'ADJ-OUT', 'ADJUSTMENT-IN', 'ADJUSTMENT-OUT', 'ADJUSTMENT-PLUS', 'ADJUSTMENT-MINUS' => ['Stock Adjustment', 'bg-blue-50 text-blue-700 ring-blue-100'],
-        'BATCH-ASSIGNMENT-IN' => ['Batch Assignment In', 'bg-emerald-50 text-emerald-700 ring-emerald-100'],
-        'BATCH-ASSIGNMENT-OUT' => ['Batch Assignment Out', 'bg-red-50 text-red-700 ring-red-100'],
-        'DO', 'SALE-DELIVERY' => ['Sales Delivery', 'bg-red-50 text-red-700 ring-red-100'],
-        'PRODUCTION-OUTPUT' => ['Production Output', 'bg-purple-50 text-purple-700 ring-purple-100'],
-        'PRODUCTION-INPUT', 'SERVICE' => ['Production Consumption', 'bg-gray-100 text-gray-700 ring-gray-200'],
-        default => [str($type ?: 'Unknown')->replace(['_', '-'], ' ')->title()->toString(), 'bg-slate-100 text-slate-700 ring-slate-200'],
+    $label = \App\Models\Inventory\StockMovement::typeLabel((string) $type);
+    $classes = match ($normalized) {
+        'IN', 'RCV', 'RECEIVE', 'PURCHASE-RECEIVE', 'TRANSFER-IN', 'TRF-IN', 'ADJUSTMENT-IN', 'ADJ-IN', 'BATCH-ASSIGNMENT-IN', 'RETURN-IN', 'PRODUCTION-OUTPUT' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+        'OUT', 'DO', 'SALE-DELIVERY', 'TRANSFER-OUT', 'TRF-OUT', 'ADJUSTMENT-OUT', 'ADJ-OUT', 'BATCH-ASSIGNMENT-OUT', 'RETURN-OUT', 'PRODUCTION-INPUT', 'SERVICE' => 'bg-red-50 text-red-700 ring-red-100',
+        default => 'bg-slate-100 text-slate-700 ring-slate-200',
     };
 @endphp
 

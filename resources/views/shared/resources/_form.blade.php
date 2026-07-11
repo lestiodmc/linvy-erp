@@ -12,7 +12,7 @@
     @endphp
 
     <div class="mx-auto max-w-4xl">
-        <form method="POST" action="{{ $action }}" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <form method="POST" action="{{ $action }}" class="enterprise-form overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             @csrf
             @if($method !== 'POST')
                 @method($method)

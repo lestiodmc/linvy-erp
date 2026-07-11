@@ -7,6 +7,10 @@ return [
 
     'optional_modules' => ['inventory', 'purchase', 'sales', 'production', 'accounting'],
 
+    'inventory' => [
+        'reconciliation_tolerance' => 0.000001,
+    ],
+
     'default_enabled_modules' => [
         'inventory' => true,
         'purchase' => true,
@@ -52,6 +56,7 @@ return [
         'inventory' => [
             'label' => 'Inventory',
             'items' => [
+                ['label' => 'Inventory Dashboard', 'route' => 'inventory.dashboard', 'routes' => ['inventory.dashboard']],
                 ['label' => 'Stock Movements', 'route' => 'stock-movements.index', 'routes' => ['stock-movements.*']],
                 ['label' => 'Stock Balances', 'route' => 'stock-balances.index', 'routes' => ['stock-balances.*']],
                 ['label' => 'Item Ledger', 'route' => 'item-ledger.index', 'routes' => ['item-ledger.*']],
