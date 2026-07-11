@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AccountingAccountController;
 use App\Http\Controllers\Admin\AccountMappingController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\BranchController;
+use App\Http\Controllers\Admin\BatchAssignmentController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\CurrencyController;
 use App\Http\Controllers\Admin\CustomerController;
@@ -95,6 +96,7 @@ Route::middleware('auth')->group(function () {
         Route::get('inventory/stock-adjustments/item-info', [StockAdjustmentController::class, 'itemInfo'])->name('inventory.stock-adjustments.item-info');
         Route::resource('stock-movements', StockMovementController::class)->only(['index', 'show'])->parameters(['stock-movements' => 'record']);
         Route::get('stock-balances/{record}/batches', [StockBalanceController::class, 'batches'])->name('stock-balances.batches');
+        Route::post('batch-assignments/{batchAssignment}/post', [BatchAssignmentController::class, 'post'])->name('batch-assignments.post');
         Route::resource('stock-balances', StockBalanceController::class)->only(['index', 'show'])->parameters(['stock-balances' => 'record']);
         Route::get('warehouse-transfers/items/search', [WarehouseTransferController::class, 'items'])->name('warehouse-transfers.items');
         Route::get('warehouse-transfers/item-info', [WarehouseTransferController::class, 'itemInfo'])->name('warehouse-transfers.item-info');

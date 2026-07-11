@@ -35,7 +35,8 @@ class StockAdjustmentService
                 'warehouse_id' => $warehouse->id,
                 'adjustment_date' => $data['adjustment_date'],
                 'status' => StockAdjustment::STATUS_DRAFT,
-                'reason' => $data['reason'],
+                'reason_code' => $data['reason_code'],
+                'reason' => $data['reason'] ?? $data['reason_code'],
                 'notes' => $data['notes'] ?? null,
                 'created_by' => Auth::id(),
             ]);
@@ -60,7 +61,8 @@ class StockAdjustmentService
                 'branch_id' => $branch->id,
                 'warehouse_id' => $warehouse->id,
                 'adjustment_date' => $data['adjustment_date'],
-                'reason' => $data['reason'],
+                'reason_code' => $data['reason_code'],
+                'reason' => $data['reason'] ?? $data['reason_code'],
                 'notes' => $data['notes'] ?? null,
             ]);
 
@@ -86,7 +88,25 @@ class StockAdjustmentService
                     throw ValidationException::withMessages(['lines' => 'At least one adjustment line is required.']);
                 }
 
+                if (
+                    StockMovement::query()
+                        ->where('reference_type', StockAdjustment::class)
+                        ->where('reference_id', $record->id)
+                        ->whereIn('transaction_type', [
+                            StockMovement::TRANSACTION_ADJ_IN,
+                            StockMovement::TRANSACTION_ADJ_OUT,
+                            StockMovement::LEGACY_TRANSACTION_ADJ_IN,
+                            StockMovement::LEGACY_TRANSACTION_ADJ_OUT,
+                        ])
+                        ->exists()
+                ) {
+                    throw ValidationException::withMessages([
+                        'inventory' => 'Stock adjustment has already created stock movements.',
+                    ]);
+                }
+
                 $this->validateDuplicateNormalItems($record->lines);
+                $postedMovementCount = 0;
 
                 foreach ($record->lines as $line) {
                     $item = $line->item;
@@ -130,7 +150,7 @@ class StockAdjustmentService
                         'base_qty' => $movementQty,
                         'unit_cost' => $unitCost,
                         'total_cost' => $movementQty * $unitCost,
-                        'batch_no' => (bool) $item->is_serial_tracked ? null : $line->batch_no,
+                        'batch_no' => (bool) $item->is_batch_tracked ? $line->batch_no : null,
                         'expiry_date' => (bool) $item->is_serial_tracked ? null : $line->expiry_date,
                         'reference_type' => StockAdjustment::class,
                         'reference_id' => $record->id,
@@ -147,6 +167,7 @@ class StockAdjustmentService
                             $serialMovementData['total_cost'] = $unitCost;
                             $this->inventoryPostingService->createMovement($serialMovementData);
                             $this->inventoryPostingService->updateStockBalance($serialMovementData);
+                            $postedMovementCount++;
                         }
 
                         continue;
@@ -154,6 +175,13 @@ class StockAdjustmentService
 
                     $this->inventoryPostingService->createMovement($movementData);
                     $this->inventoryPostingService->updateStockBalance($movementData);
+                    $postedMovementCount++;
+                }
+
+                if ($postedMovementCount === 0) {
+                    throw ValidationException::withMessages([
+                        'lines' => 'At least one line must have a stock difference before posting.',
+                    ]);
                 }
 
                 $record->update([
@@ -311,9 +339,9 @@ class StockAdjustmentService
             'movement_type' => $legacyMovementType,
             'quantity' => abs($adjustmentQty),
             'unit_cost' => (float) ($item->standard_cost ?? 0),
-            'batch_no' => (bool) $item->is_serial_tracked ? null : $batchNo,
+            'batch_no' => (bool) $item->is_batch_tracked ? $batchNo : null,
             'serial_numbers' => (bool) $item->is_serial_tracked ? ($line['serial_numbers'] ?? null) : null,
-            'expiry_date' => (bool) $item->is_serial_tracked ? null : ($line['expiry_date'] ?? null),
+            'expiry_date' => (bool) $item->is_batch_tracked ? ($line['expiry_date'] ?? null) : null,
             'remarks' => $line['remarks'] ?? null,
             'notes' => $line['remarks'] ?? null,
         ];
@@ -341,8 +369,22 @@ class StockAdjustmentService
                 $errors["$prefix.batch_no"] = 'Batch number is required for batch tracked item '.$sku.'.';
             }
 
-            if ((bool) $item->has_expiry_date && blank($line['expiry_date'] ?? null)) {
-                $errors["$prefix.expiry_date"] = 'Expiry date is required for expiry tracked item '.$sku.'.';
+            if ((bool) $item->is_batch_tracked) {
+                $batch = $this->batchBalance($item, (int) $record->warehouse_id, $line['batch_no'] ?? null, $line['expiry_date'] ?? null);
+
+                if (! $batch) {
+                    $errors["$prefix.batch_no"] = 'Selected batch does not have stock in the adjustment warehouse.';
+                } elseif (filled($line['expiry_date'] ?? null) && $batch->expiry_date?->format('Y-m-d') !== $line['expiry_date']) {
+                    $errors["$prefix.expiry_date"] = 'Expiry date must follow the selected batch.';
+                } elseif ((bool) $item->has_expiry_date && blank($batch->expiry_date)) {
+                    $errors["$prefix.expiry_date"] = 'Selected batch does not have an expiry date.';
+                }
+            } elseif (filled($line['batch_no'] ?? null)) {
+                $errors["$prefix.batch_no"] = 'Batch number is only allowed for batch tracked items.';
+            }
+
+            if (! (bool) $item->is_batch_tracked && filled($line['expiry_date'] ?? null)) {
+                $errors["$prefix.expiry_date"] = 'Expiry date is only allowed for batch tracked items.';
             }
         }
 
@@ -374,6 +416,27 @@ class StockAdjustmentService
         }
 
         return $warehouse;
+    }
+
+    private function batchBalance(Item $item, int $warehouseId, ?string $batchNo, mixed $expiryDate): ?StockBatchBalance
+    {
+        if (blank($batchNo)) {
+            return null;
+        }
+
+        $expiry = $expiryDate instanceof \DateTimeInterface ? $expiryDate->format('Y-m-d') : $expiryDate;
+
+        $query = StockBatchBalance::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $item->id)
+            ->where('batch_no', $batchNo)
+            ->where('qty_on_hand', '>', 0);
+
+        filled($expiry)
+            ? $query->whereDate('expiry_date', $expiry)
+            : $query->whereNull('expiry_date');
+
+        return $query->first();
     }
 
     private function ensureDraft(StockAdjustment $record): void

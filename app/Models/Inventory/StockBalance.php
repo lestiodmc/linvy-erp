@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 
 class StockBalance extends Model
 {
@@ -89,5 +90,11 @@ class StockBalance extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /** Restrict balances to warehouses within the user's permitted branches. */
+    public function scopeAccessibleFromBranches(Builder $query, array $branchIds): Builder
+    {
+        return $query->whereHas('warehouse', fn (Builder $warehouse) => $warehouse->whereIn('branch_id', $branchIds));
     }
 }

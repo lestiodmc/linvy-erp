@@ -31,6 +31,7 @@
     @php
         $formatQty = fn ($value) => number_format((float) $value, 4);
         $formatDate = fn ($date) => $date ? \Illuminate\Support\Carbon::parse($date)->format('Y-m-d') : '-';
+        $reasonLabel = $reasonCodes[$record->reason_code] ?? str($record->reason_code ?: $record->reason ?: '-')->replace('_', ' ')->title()->toString();
         $headCell = 'px-3 py-2 text-left text-[11px] font-black uppercase tracking-wide text-slate-500';
         $cell = 'px-3 py-2';
         $lineType = function ($qty): array {
@@ -47,10 +48,14 @@
     <div class="mx-auto max-w-screen-2xl">
         @include('purchase.shared.flash')
 
-        <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <div class="rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Status</p>
                 <div class="mt-1"><x-ui.status-badge :status="$record->status" /></div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Company</p>
+                <p class="mt-1 font-bold text-slate-900">{{ $record->company?->name ?: '-' }}</p>
             </div>
             <div class="rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Branch</p>
@@ -72,8 +77,8 @@
 
         <div class="mb-4 grid gap-3 lg:grid-cols-2">
             <div class="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Reason</p>
-                <p class="mt-1 text-sm font-semibold text-slate-800">{{ $record->reason ?: '-' }}</p>
+                <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Reason Code</p>
+                <span class="mt-1 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700 ring-1 ring-blue-100">{{ $reasonLabel }}</span>
             </div>
             <div class="rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Notes</p>
@@ -89,8 +94,8 @@
                     <th class="{{ $headCell }} whitespace-nowrap">Batch</th>
                     <th class="{{ $headCell }} whitespace-nowrap">Expiry</th>
                     <th class="{{ $headCell }} whitespace-nowrap text-right">System Qty</th>
-                    <th class="{{ $headCell }} whitespace-nowrap text-right">Counted Qty</th>
-                    <th class="{{ $headCell }} whitespace-nowrap text-right">Adjustment</th>
+                    <th class="{{ $headCell }} whitespace-nowrap text-right">Physical Qty</th>
+                    <th class="{{ $headCell }} whitespace-nowrap text-right">Difference</th>
                     <th class="{{ $headCell }} whitespace-nowrap">UOM</th>
                     <th class="{{ $headCell }} min-w-52">Reason / Notes</th>
                 </tr>

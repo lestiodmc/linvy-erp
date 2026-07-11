@@ -22,7 +22,7 @@
 
             $type = strtoupper(str_replace('_', '-', (string) ($record->transaction_type ?: $record->movement_type)));
 
-            return in_array($type, ['IN', 'RCV', 'PURCHASE-RECEIVE', 'ADJ-IN', 'TRF-IN', 'RETURN-IN', 'PRODUCTION-OUTPUT'], true)
+            return in_array($type, ['IN', 'RCV', 'PURCHASE-RECEIVE', 'ADJ-IN', 'ADJUSTMENT-IN', 'TRF-IN', 'TRANSFER-IN', 'RETURN-IN', 'PRODUCTION-OUTPUT'], true)
                 ? (float) ($record->base_qty ?: $record->qty)
                 : 0;
         };
@@ -34,7 +34,7 @@
 
             $type = strtoupper(str_replace('_', '-', (string) ($record->transaction_type ?: $record->movement_type)));
 
-            return in_array($type, ['OUT', 'DO', 'SALE-DELIVERY', 'ADJ-OUT', 'TRF-OUT', 'RETURN-OUT', 'SERVICE', 'PRODUCTION-INPUT'], true)
+            return in_array($type, ['OUT', 'DO', 'SALE-DELIVERY', 'ADJ-OUT', 'ADJUSTMENT-OUT', 'TRF-OUT', 'TRANSFER-OUT', 'RETURN-OUT', 'SERVICE', 'PRODUCTION-INPUT'], true)
                 ? (float) ($record->base_qty ?: $record->qty)
                 : 0;
         };
@@ -44,6 +44,8 @@
 
             $routeName = match ($type) {
                 'RCV', 'PURCHASE-RECEIVE' => 'receivings.show',
+                'ADJ-IN', 'ADJ-OUT', 'ADJUSTMENT-IN', 'ADJUSTMENT-OUT' => 'stock-adjustments.show',
+                'TRF-IN', 'TRF-OUT', 'TRANSFER-IN', 'TRANSFER-OUT' => 'warehouse-transfers.show',
                 default => null,
             };
 

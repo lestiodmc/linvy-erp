@@ -31,8 +31,12 @@
         $headCell = 'px-3 py-2 text-left text-[11px] font-black uppercase tracking-wide text-slate-500';
         $cell = 'px-3 py-2';
         $totalQty = $record->lines->sum(fn ($line) => (float) $line->quantity);
-        $transferOutQty = $movements->where('transaction_type', \App\Models\Inventory\StockMovement::TRANSACTION_TRF_OUT)->sum(fn ($movement) => (float) $movement->qty);
-        $transferInQty = $movements->where('transaction_type', \App\Models\Inventory\StockMovement::TRANSACTION_TRF_IN)->sum(fn ($movement) => (float) $movement->qty);
+        $transferOutQty = $movements
+            ->whereIn('transaction_type', [\App\Models\Inventory\StockMovement::TRANSACTION_TRF_OUT, \App\Models\Inventory\StockMovement::LEGACY_TRANSACTION_TRF_OUT])
+            ->sum(fn ($movement) => (float) $movement->qty);
+        $transferInQty = $movements
+            ->whereIn('transaction_type', [\App\Models\Inventory\StockMovement::TRANSACTION_TRF_IN, \App\Models\Inventory\StockMovement::LEGACY_TRANSACTION_TRF_IN])
+            ->sum(fn ($movement) => (float) $movement->qty);
     @endphp
 
     <div class="mx-auto max-w-screen-2xl space-y-4">

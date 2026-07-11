@@ -35,13 +35,19 @@
                 @method($method)
             @endif
 
-            <div class="grid gap-5 border-b border-slate-100 p-6 md:grid-cols-2 lg:grid-cols-4">
+            <div class="grid gap-4 border-b border-slate-100 p-5 md:grid-cols-2 lg:grid-cols-5">
+                <div>
+                    <label class="text-sm font-bold text-slate-600">Company</label>
+                    <div class="mt-1 flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-700" data-company-label>
+                        {{ $record->company?->name ?: '-' }}
+                    </div>
+                </div>
                 <div>
                     <label class="text-sm font-bold text-slate-600">Branch</label>
                     <select name="branch_id" data-adjustment-branch class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Select branch</option>
                         @foreach($branches as $branch)
-                            <option value="{{ $branch->id }}" @selected((string) old('branch_id', $record->branch_id) === (string) $branch->id)>{{ $branch->name }}</option>
+                            <option value="{{ $branch->id }}" data-company-name="{{ $branch->company?->name }}" @selected((string) old('branch_id', $record->branch_id) === (string) $branch->id)>{{ $branch->name }}</option>
                         @endforeach
                     </select>
                     @error('branch_id')<p class="mt-1 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
@@ -64,13 +70,19 @@
                     @error('adjustment_date')<p class="mt-1 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label class="text-sm font-bold text-slate-600">Reason</label>
-                    <input name="reason" value="{{ old('reason', $record->reason) }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                    @error('reason')<p class="mt-1 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                    <label class="text-sm font-bold text-slate-600">Reason Code</label>
+                    <select name="reason_code" class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="">Select reason</option>
+                        @foreach($reasonCodes as $code => $label)
+                            <option value="{{ $code }}" @selected((string) old('reason_code', $record->reason_code ?: \App\Models\StockAdjustment::REASON_CORRECTION) === (string) $code)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('reason_code')<p class="mt-1 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
                 </div>
-                <div class="md:col-span-2 lg:col-span-4">
+                <div class="md:col-span-2 lg:col-span-5">
                     <label class="text-sm font-bold text-slate-600">Notes</label>
                     <input name="notes" value="{{ old('notes', $record->notes) }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <input type="hidden" name="reason" value="{{ old('reason', $record->reason) }}">
                 </div>
             </div>
 
@@ -88,16 +100,16 @@
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
                         <thead class="bg-slate-50">
                             <tr class="text-left text-xs font-black uppercase text-slate-500">
-                                <th class="px-3 py-3">Item</th>
-                                <th class="px-3 py-3 text-right">System Qty</th>
-                                <th class="px-3 py-3 text-right">Counted Qty</th>
-                                <th class="px-3 py-3 text-right">Adjustment Qty</th>
-                                <th class="px-3 py-3">UoM</th>
-                                <th class="px-3 py-3 {{ $showBatchColumn ? '' : 'hidden' }}" data-header-col="batch">Batch No</th>
-                                <th class="px-3 py-3 {{ $showSerialColumn ? '' : 'hidden' }}" data-header-col="serial">Serial Numbers</th>
-                                <th class="px-3 py-3 {{ $showExpiryColumn ? '' : 'hidden' }}" data-header-col="expiry">Expiry Date</th>
-                                <th class="px-3 py-3">Remark</th>
-                                <th class="sticky right-0 bg-slate-50 px-3 py-3 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">Action</th>
+                                <th class="px-3 py-2">Item</th>
+                                <th class="px-3 py-2 text-right">System Qty</th>
+                                <th class="px-3 py-2 text-right">Physical Qty</th>
+                                <th class="px-3 py-2 text-right">Difference</th>
+                                <th class="px-3 py-2">UoM</th>
+                                <th class="px-3 py-2 {{ $showBatchColumn ? '' : 'hidden' }}" data-header-col="batch">Batch</th>
+                                <th class="px-3 py-2 {{ $showSerialColumn ? '' : 'hidden' }}" data-header-col="serial">Serial Numbers</th>
+                                <th class="px-3 py-2 {{ $showExpiryColumn ? '' : 'hidden' }}" data-header-col="expiry">Expiry</th>
+                                <th class="px-3 py-2">Remark</th>
+                                <th class="sticky right-0 bg-slate-50 px-3 py-2 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">Action</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100" data-lines>
@@ -187,6 +199,7 @@
 
                 select.innerHTML = '<option value="">Select batch</option>';
                 batches.forEach((batch) => {
+                    if (Number(batch.qty_on_hand || 0) <= 0) return;
                     const option = document.createElement('option');
                     option.value = batch.batch_no || '';
                     option.textContent = `${batch.label || batch.batch_no} (${Number(batch.qty_on_hand || 0).toFixed(4)})`;
@@ -195,7 +208,10 @@
                     select.appendChild(option);
                 });
 
-                select.classList.toggle('hidden', batches.length === 0);
+                const currentBatch = row.querySelector('[data-batch-no]')?.value || '';
+                if (currentBatch && Array.from(select.options).some((option) => option.value === currentBatch)) {
+                    select.value = currentBatch;
+                }
             },
             setSearchableValue(row, option) {
                 const root = row.querySelector('[x-data^="linvySearchableSelect"]');
@@ -330,12 +346,11 @@
                 const isBatch = row.dataset.batchTracked === '1';
                 const isSerial = row.dataset.serialTracked === '1';
                 const hasExpiry = row.dataset.expiryTracked === '1';
-                batchInput.disabled = isSerial || (!isBatch && !hasExpiry);
+                batchInput.disabled = isSerial || !isBatch;
                 if (batchSelect) batchSelect.disabled = batchInput.disabled;
                 serialInput.disabled = !isSerial;
-                expiryInput.disabled = isSerial || !hasExpiry;
-                batchInput.classList.toggle('hidden', batchInput.disabled);
-                if (batchSelect) batchSelect.classList.toggle('hidden', batchInput.disabled || batchSelect.options.length <= 1);
+                expiryInput.disabled = isSerial || !isBatch || !hasExpiry;
+                if (batchSelect) batchSelect.classList.toggle('hidden', batchInput.disabled);
                 serialInput.classList.toggle('hidden', serialInput.disabled);
                 expiryInput.classList.toggle('hidden', expiryInput.disabled);
                 row.querySelector('[data-batch-na]')?.classList.toggle('hidden', !batchInput.disabled);
@@ -392,6 +407,10 @@
 
             const refreshWarehouses = (resetInvalid = false) => {
                 const branchId = branchSelect.value || '';
+                const selectedBranch = branchSelect.selectedOptions[0];
+                const companyLabel = form.querySelector('[data-company-label]');
+                if (companyLabel) companyLabel.textContent = selectedBranch?.dataset.companyName || '-';
+
                 Array.from(warehouseSelect.options).forEach((option) => {
                     if (!option.value) return;
                     const visible = option.dataset.branchId === branchId;
@@ -409,6 +428,11 @@
                 if (event.target.matches('[data-counted-qty]')) window.linvyStockAdjustment.recalculate(row);
                 if (event.target.matches('[data-batch-no]')) window.linvyStockAdjustment.fetchCurrentStock(row);
                 if (event.target.matches('[data-expiry-date]')) window.linvyStockAdjustment.fetchCurrentStock(row);
+            });
+
+            form.addEventListener('change', (event) => {
+                const row = event.target.closest('[data-line]');
+                if (!row) return;
                 if (event.target.matches('[data-batch-select]')) {
                     const option = event.target.selectedOptions[0];
                     row.querySelector('[data-batch-no]').value = event.target.value || '';

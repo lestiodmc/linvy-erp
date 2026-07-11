@@ -11,12 +11,10 @@
         $formatDate = fn ($date) => $date ? \Illuminate\Support\Carbon::parse($date)->format('d M Y') : '-';
         $cell = 'px-3 py-2';
         $headCell = 'px-3 py-2 text-left text-[11px] font-black uppercase tracking-wide text-slate-500';
-        $movementBadge = function (string $category): string {
-            return match ($category) {
-                'receive' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-                'issue' => 'bg-red-50 text-red-700 ring-red-100',
-                'transfer' => 'bg-blue-50 text-blue-700 ring-blue-100',
-                'adjustment' => 'bg-orange-50 text-orange-700 ring-orange-100',
+        $movementBadge = function (string $direction): string {
+            return match ($direction) {
+                'in' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+                'out' => 'bg-red-50 text-red-700 ring-red-100',
                 default => 'bg-slate-100 text-slate-700 ring-slate-200',
             };
         };
@@ -49,6 +47,10 @@
             </div>
             <x-ui.select-filter name="batch_no" label="Batch" :value="$filters['batch_no'] ?? '__all'" :options="$batches" all-label="All Batch" />
             <x-ui.select-filter name="movement_type" label="Movement Type" :value="$filters['movement_type'] ?? ''" :options="$movementTypes" all-label="All movements" />
+            <div>
+                <label class="sr-only" for="reference">Document number</label>
+                <input id="reference" name="reference" value="{{ $filters['reference'] ?? '' }}" placeholder="Document no." class="h-10 w-full rounded-lg border-slate-200 px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+            </div>
             <x-ui.date-range :from="$filters['date_from'] ?? ''" :to="$filters['date_to'] ?? ''" />
             <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Search</button>
             <a href="{{ route('item-ledger.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Reset</a>
@@ -77,18 +79,19 @@
             <x-slot:head>
                 <tr>
                     <th class="{{ $headCell }} whitespace-nowrap">Date</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Reference No</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Document Type</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Movement Type</th>
+                    <th class="{{ $headCell }} whitespace-nowrap">Document No</th>
+                    <th class="{{ $headCell }} whitespace-nowrap">Transaction Type</th>
+                    <th class="{{ $headCell }} whitespace-nowrap">Reference Type</th>
                     <th class="{{ $headCell }} whitespace-nowrap">Warehouse</th>
+                    <th class="{{ $headCell }} whitespace-nowrap">Item SKU</th>
+                    <th class="{{ $headCell }} whitespace-nowrap">Item Name</th>
                     <th class="{{ $headCell }} whitespace-nowrap">Batch</th>
                     <th class="{{ $headCell }} whitespace-nowrap">Expiry Date</th>
-                    <th class="{{ $headCell }} min-w-60">Description</th>
                     <th class="{{ $headCell }} whitespace-nowrap text-right">In Qty</th>
                     <th class="{{ $headCell }} whitespace-nowrap text-right">Out Qty</th>
                     <th class="{{ $headCell }} whitespace-nowrap text-right">Running Balance</th>
                     <th class="{{ $headCell }} whitespace-nowrap">UoM</th>
-                    <th class="{{ $headCell }} whitespace-nowrap">Created By</th>
+                    <th class="{{ $headCell }} min-w-48">Notes</th>
                 </tr>
             </x-slot:head>
 
@@ -105,14 +108,15 @@
                             <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700 ring-1 ring-slate-200">Opening</span>
                         </td>
                         <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
+                        <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
+                        <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
                         <td class="{{ $cell }} whitespace-nowrap font-semibold text-slate-700">{{ $openingRow['batch_no'] }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-slate-500">{{ $formatDate($openingRow['expiry_date']) }}</td>
-                        <td class="{{ $cell }} min-w-60 text-slate-600">Opening - {{ $openingRow['batch_no'] }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-right text-slate-400">{{ $formatQty(0) }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-right text-slate-400">{{ $formatQty(0) }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-right font-semibold text-slate-900">{{ $formatQty($runningOpening) }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
-                        <td class="{{ $cell }} whitespace-nowrap text-slate-500">System</td>
+                        <td class="{{ $cell }} text-slate-500">Opening balance before selected period</td>
                     </tr>
                 @empty
                     <tr class="bg-slate-50 text-xs">
@@ -123,14 +127,15 @@
                             <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700 ring-1 ring-slate-200">Opening</span>
                         </td>
                         <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
+                        <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
+                        <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
                         <td class="{{ $cell }} whitespace-nowrap text-slate-500">{{ ($filters['batch_no'] ?? '__all') === '__no_batch' ? 'No Batch' : (($filters['batch_no'] ?? '__all') === '__all' ? 'All Batch' : $filters['batch_no']) }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
-                        <td class="{{ $cell }} min-w-60 text-slate-600">Opening balance before selected period</td>
                         <td class="{{ $cell }} whitespace-nowrap text-right text-slate-400">{{ $formatQty(0) }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-right text-slate-400">{{ $formatQty(0) }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-right font-semibold text-slate-900">{{ $formatQty($openingBalance) }}</td>
                         <td class="{{ $cell }} whitespace-nowrap text-slate-500">-</td>
-                        <td class="{{ $cell }} whitespace-nowrap text-slate-500">System</td>
+                        <td class="{{ $cell }} text-slate-500">Opening balance before selected period</td>
                     </tr>
                 @endforelse
             @endif
@@ -142,22 +147,23 @@
                     <td class="{{ $cell }} whitespace-nowrap">
                         <a href="{{ $row['reference_url'] }}" class="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline">{{ $row['reference_no'] }}</a>
                     </td>
-                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $row['document_type'] }}</td>
                     <td class="{{ $cell }} whitespace-nowrap">
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 {{ $movementBadge($row['movement_category']) }}">{{ $row['movement_label'] }}</span>
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 {{ $movementBadge($row['movement_direction']) }}">{{ $row['movement_label'] }}</span>
                     </td>
+                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $movement->reference_type ?: '-' }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $movement->warehouse?->name ?: '-' }}</td>
+                    <td class="{{ $cell }} whitespace-nowrap font-semibold text-slate-700">{{ $movement->item?->sku ?: '-' }}</td>
+                    <td class="{{ $cell }} max-w-56 truncate text-slate-700" title="{{ $movement->item?->name }}">{{ $movement->item?->name ?: '-' }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $row['batch_no'] }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $formatDate($row['expiry_date']) }}</td>
-                    <td class="{{ $cell }} min-w-60 max-w-96 truncate text-slate-700">{{ $row['description'] }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-right font-semibold {{ $row['in_qty'] > 0 ? 'text-emerald-700' : 'text-slate-400' }}">{{ $formatQty($row['in_qty']) }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-right font-semibold {{ $row['out_qty'] > 0 ? 'text-red-700' : 'text-slate-400' }}">{{ $formatQty($row['out_qty']) }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-right font-semibold {{ $row['running_balance'] < 0 ? 'text-red-700' : 'text-slate-900' }}">{{ $formatQty($row['running_balance']) }}</td>
                     <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $row['uom'] }}</td>
-                    <td class="{{ $cell }} whitespace-nowrap text-slate-600">{{ $movement->createdBy?->name ?: '-' }}</td>
+                    <td class="{{ $cell }} max-w-64 truncate text-slate-600" title="{{ $movement->remarks ?: $movement->notes }}">{{ $movement->remarks ?: $movement->notes ?: '-' }}</td>
                 </tr>
             @empty
-                <x-ui.empty-state colspan="13" message="No inventory movement found." />
+                <x-ui.empty-state colspan="14" message="No inventory movement found." />
             @endforelse
         </x-ui.data-table>
 

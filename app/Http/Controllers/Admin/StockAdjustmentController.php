@@ -4,8 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StockAdjustmentRequest;
-use App\Models\Inventory\StockBatchBalance;
 use App\Models\Branch;
+use App\Models\Company;
+use App\Models\Inventory\StockBatchBalance;
 use App\Models\Item;
 use App\Models\StockAdjustment;
 use App\Models\Warehouse;
@@ -32,20 +33,25 @@ class StockAdjustmentController extends Controller
 
         return view('inventory.stock_adjustments.index', [
             'records' => StockAdjustment::query()
-                ->with(['warehouse', 'branch', 'createdBy', 'lines'])
+                ->with(['company', 'warehouse', 'branch', 'createdBy', 'lines.item'])
                 ->withCount('lines')
                 ->when(! Auth::user()?->isSuperAdmin(), fn (Builder $query) => $query->whereIn('branch_id', $branchIds))
                 ->when(filled($filters['date_from'] ?? null), fn (Builder $query) => $query->whereDate('adjustment_date', '>=', $filters['date_from']))
                 ->when(filled($filters['date_to'] ?? null), fn (Builder $query) => $query->whereDate('adjustment_date', '<=', $filters['date_to']))
                 ->when(filled($filters['branch_id'] ?? null), fn (Builder $query) => $query->where('branch_id', $filters['branch_id']))
                 ->when(filled($filters['warehouse_id'] ?? null), fn (Builder $query) => $query->where('warehouse_id', $filters['warehouse_id']))
+                ->when(filled($filters['reason_code'] ?? null), fn (Builder $query) => $query->where('reason_code', $filters['reason_code']))
                 ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
                 ->when(filled($filters['keyword'] ?? null), function (Builder $query) use ($filters): void {
                     $keyword = $filters['keyword'];
 
                     $query->where(function (Builder $search) use ($keyword): void {
                         $search->where('number', 'like', '%'.$keyword.'%')
-                            ->orWhere('reason', 'like', '%'.$keyword.'%');
+                            ->orWhere('reason', 'like', '%'.$keyword.'%')
+                            ->orWhere('reason_code', 'like', '%'.$keyword.'%')
+                            ->orWhereHas('lines.item', fn (Builder $item) => $item
+                                ->where('sku', 'like', '%'.$keyword.'%')
+                                ->orWhere('name', 'like', '%'.$keyword.'%'));
                     });
                 })
                 ->orderByDesc('adjustment_date')
@@ -54,6 +60,7 @@ class StockAdjustmentController extends Controller
                 ->withQueryString(),
             'filters' => $filters,
             'statuses' => StockAdjustment::STATUSES,
+            'reasonCodes' => StockAdjustment::reasonLabels(),
             'branches' => $branches,
             'warehouses' => $this->warehouses(),
         ]);
@@ -91,7 +98,8 @@ class StockAdjustmentController extends Controller
         $this->ensureBranchAccess((int) $record->branch_id);
 
         return view('inventory.stock_adjustments.show', [
-            'record' => $record->load(['branch', 'warehouse', 'createdBy', 'postedBy', 'lines.item', 'lines.uom', 'lines.unit']),
+            'record' => $record->load(['company', 'branch', 'warehouse', 'createdBy', 'postedBy', 'lines.item', 'lines.uom', 'lines.unit']),
+            'reasonCodes' => StockAdjustment::reasonLabels(),
         ]);
     }
 
@@ -155,10 +163,18 @@ class StockAdjustmentController extends Controller
             'expiry_date' => ['nullable', 'date'],
         ]);
 
+        $warehouse = $this->accessibleWarehouse((int) $data['warehouse_id']);
+
+        if (! $warehouse) {
+            throw ValidationException::withMessages([
+                'warehouse_id' => 'You do not have access to this warehouse.',
+            ]);
+        }
+
         $item = Item::query()
             ->with(['baseUnit:id,code,name', 'unitOfMeasure:id,code,name', 'category:id,name', 'brand:id,name'])
             ->findOrFail($data['item_id']);
-        $warehouse = Warehouse::query()->with('branch:id,name')->findOrFail($data['warehouse_id']);
+        $warehouse->load('branch:id,name');
 
         if (! (bool) $item->track_inventory) {
             throw ValidationException::withMessages([
@@ -166,8 +182,8 @@ class StockAdjustmentController extends Controller
             ]);
         }
 
-        $currentStock = $this->stockAdjustmentService->currentStockQty($item, (int) $data['warehouse_id'], $data['batch_no'] ?? null, $data['expiry_date'] ?? null);
-        $batches = $this->batchOptions($item, (int) $data['warehouse_id']);
+        $currentStock = $this->stockAdjustmentService->currentStockQty($item, $warehouse->id, $data['batch_no'] ?? null, $data['expiry_date'] ?? null);
+        $batches = $this->batchOptions($item, $warehouse->id);
 
         return response()->json([
             'sku' => $item->sku,
@@ -209,6 +225,11 @@ class StockAdjustmentController extends Controller
         }
 
         $warehouseId = $request->filled('warehouse_id') ? (int) $request->query('warehouse_id') : null;
+        $warehouse = $warehouseId ? $this->accessibleWarehouse($warehouseId) : null;
+
+        if ($warehouseId && ! $warehouse) {
+            return response()->json([]);
+        }
 
         $items = Item::query()
             ->with([
@@ -234,8 +255,8 @@ class StockAdjustmentController extends Controller
             'name' => $item->name,
             'category' => $item->category?->name,
             'brand' => $item->brand?->name,
-            'available_qty' => $warehouseId ? $this->stockAdjustmentService->currentStockQty($item, $warehouseId) : 0.0,
-            'batches' => $warehouseId ? $this->batchOptions($item, $warehouseId) : [],
+            'available_qty' => $warehouse ? $this->stockAdjustmentService->currentStockQty($item, $warehouse->id) : 0.0,
+            'batches' => $warehouse ? $this->batchOptions($item, $warehouse->id) : [],
             'unit_id' => $item->base_unit_id ?: $item->unit_of_measure_id,
             'unit_text' => $item->baseUnit?->code ?: $item->unitOfMeasure?->code,
             'tracking' => [
@@ -256,6 +277,7 @@ class StockAdjustmentController extends Controller
         $batches = StockBatchBalance::query()
             ->where('warehouse_id', $warehouseId)
             ->where('item_id', $item->id)
+            ->where('qty_on_hand', '>', 0)
             ->orderBy('expiry_date')
             ->orderBy('batch_no')
             ->get(['batch_no', 'expiry_date', 'qty_on_hand', 'qty_available'])
@@ -268,20 +290,6 @@ class StockAdjustmentController extends Controller
             ])
             ->values();
 
-        $totalQty = $this->stockAdjustmentService->currentStockQty($item, $warehouseId);
-        $knownBatchQty = $batches->sum('qty_on_hand');
-        $legacyNoBatchQty = max(0, $totalQty - $knownBatchQty);
-
-        if ($legacyNoBatchQty > 0.000001) {
-            $batches->prepend([
-                'batch_no' => 'NO_BATCH',
-                'label' => 'NO_BATCH - Legacy unbatched stock',
-                'expiry_date' => null,
-                'qty_on_hand' => $legacyNoBatchQty,
-                'qty_available' => $legacyNoBatchQty,
-            ]);
-        }
-
         return $batches->all();
     }
 
@@ -291,6 +299,8 @@ class StockAdjustmentController extends Controller
             'record' => $record,
             'branches' => $this->accessibleBranches(),
             'warehouses' => $this->warehouses(),
+            'companies' => Company::orderBy('name')->pluck('name', 'id')->all(),
+            'reasonCodes' => StockAdjustment::reasonLabels(),
             'selectedItems' => $this->selectedItemOptions($record),
             'lineItemTracking' => $this->lineItemTracking($record),
         ]);
@@ -351,9 +361,20 @@ class StockAdjustmentController extends Controller
             ->get();
     }
 
+    private function accessibleWarehouse(int $warehouseId): ?Warehouse
+    {
+        $branchIds = $this->accessibleBranches()->pluck('id');
+
+        return Warehouse::query()
+            ->whereKey($warehouseId)
+            ->where('is_active', true)
+            ->whereIn('branch_id', $branchIds)
+            ->first();
+    }
+
     private function accessibleBranches()
     {
-        $query = Branch::query()->where('is_active', true)->orderBy('name');
+        $query = Branch::query()->with('company')->where('is_active', true)->orderBy('name');
 
         if (! Auth::user()?->isSuperAdmin()) {
             $query->whereHas('users', fn (Builder $branchQuery) => $branchQuery->whereKey(Auth::id()));
@@ -377,7 +398,7 @@ class StockAdjustmentController extends Controller
 
     private function indexFilters(Request $request): array
     {
-        $filters = $request->only(['keyword', 'date_from', 'date_to', 'branch_id', 'warehouse_id', 'status']);
+        $filters = $request->only(['keyword', 'date_from', 'date_to', 'branch_id', 'warehouse_id', 'reason_code', 'status']);
 
         if (! $request->has('date_from')) {
             $filters['date_from'] = now()->startOfMonth()->toDateString();

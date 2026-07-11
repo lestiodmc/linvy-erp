@@ -14,23 +14,30 @@ class InventoryLedgerService
 {
     private const IN_TYPES = [
         'IN',
+        'RECEIVE',
         'RCV',
         'PURCHASE-RECEIVE',
+        'ADJUSTMENT-IN',
         'ADJ-IN',
+        'TRANSFER-IN',
         'TRF-IN',
         'RETURN-IN',
         'PRODUCTION-OUTPUT',
+        'BATCH-ASSIGNMENT-IN',
     ];
 
     private const OUT_TYPES = [
         'OUT',
         'DO',
         'SALE-DELIVERY',
+        'ADJUSTMENT-OUT',
         'ADJ-OUT',
+        'TRANSFER-OUT',
         'TRF-OUT',
         'RETURN-OUT',
         'SERVICE',
         'PRODUCTION-INPUT',
+        'BATCH-ASSIGNMENT-OUT',
     ];
 
     public function getOpeningBalance(array $filters): float
@@ -63,14 +70,15 @@ class InventoryLedgerService
 
     public function calculateRunningBalance(LengthAwarePaginator $movements, float $openingBalance, array $filters): array
     {
-        $pageOpeningBalance = $openingBalance + $this->getPreviousPageDelta($movements, $filters);
-        $runningBalance = $pageOpeningBalance;
+        $runningBalances = $this->contextOpeningBalances($movements, $filters);
+        $pageOpeningBalance = (float) array_sum($runningBalances);
 
-        $rows = $movements->getCollection()->map(function (StockMovement $movement) use (&$runningBalance): array {
+        $rows = $movements->getCollection()->map(function (StockMovement $movement) use (&$runningBalances, $filters): array {
             $inQty = $this->inQty($movement);
             $outQty = $this->outQty($movement);
+            $context = $this->contextKey($movement, $filters);
 
-            $runningBalance += $inQty - $outQty;
+            $runningBalances[$context] = ($runningBalances[$context] ?? 0.0) + $inQty - $outQty;
 
             return [
                 'movement' => $movement,
@@ -80,18 +88,19 @@ class InventoryLedgerService
                 'document_type' => $this->documentType($movement),
                 'movement_label' => $this->movementLabel($movement),
                 'movement_category' => $this->movementCategory($movement),
+                'movement_direction' => $inQty > 0 ? 'in' : ($outQty > 0 ? 'out' : 'neutral'),
                 'description' => $movement->remarks ?: $movement->notes ?: $movement->item?->name ?: '-',
                 'batch_no' => $this->batchLabel($movement),
                 'expiry_date' => $movement->expiry_date,
                 'in_qty' => $inQty,
                 'out_qty' => $outQty,
-                'running_balance' => $runningBalance,
+                'running_balance' => $runningBalances[$context],
                 'uom' => $movement->uom?->code ?: $movement->baseUom?->code ?: $movement->item?->baseUnit?->code ?: '-',
             ];
         });
 
         $periodTotals = $this->periodTotals($filters);
-        $closingBalance = $this->summaryClosingBalance($filters, $openingBalance + $periodTotals['total_in'] - $periodTotals['total_out']);
+        $closingBalance = $openingBalance + $periodTotals['total_in'] - $periodTotals['total_out'];
 
         return [
             'rows' => $rows,
@@ -107,11 +116,18 @@ class InventoryLedgerService
     {
         return StockMovement::query()
             ->whereHas('item', fn (Builder $item) => $item->where('track_inventory', true))
-            ->when(filled($filters['company_id'] ?? null), fn (Builder $query) => $query->where('company_id', $filters['company_id']))
-            ->when(filled($filters['branch_id'] ?? null), fn (Builder $query) => $query->where('branch_id', $filters['branch_id']))
+            ->when(filled($filters['company_id'] ?? null), fn (Builder $query) => $query->forCompany((int) $filters['company_id']))
+            ->when(filled($filters['branch_id'] ?? null), fn (Builder $query) => $query->forBranch((int) $filters['branch_id']))
+            ->when(array_key_exists('accessible_branch_ids', $filters), fn (Builder $query) => $query->accessibleFromBranches($filters['accessible_branch_ids']))
             ->when(filled($filters['warehouse_id'] ?? null), fn (Builder $query) => $query->where('warehouse_id', $filters['warehouse_id']))
             ->when(filled($filters['item_id'] ?? null), fn (Builder $query) => $query->where('item_id', $filters['item_id']))
             ->when(filled($filters['sku'] ?? null), fn (Builder $query) => $query->whereHas('item', fn (Builder $item) => $item->where('sku', 'like', '%'.$filters['sku'].'%')))
+            ->when(filled($filters['reference'] ?? null), function (Builder $query) use ($filters): void {
+                $term = '%'.$filters['reference'].'%';
+                $query->where(fn (Builder $reference) => $reference
+                    ->where('transaction_number', 'like', $term)
+                    ->orWhere('reference_number', 'like', $term));
+            })
             ->when(($filters['batch_no'] ?? '__all') !== '__all', function (Builder $query) use ($filters): void {
                 if ($filters['batch_no'] === '__no_batch') {
                     $query->where(function (Builder $batchQuery): void {
@@ -166,6 +182,39 @@ class InventoryLedgerService
             ->get();
 
         return $this->sumDelta($previousMovements);
+    }
+
+    private function contextOpeningBalances(LengthAwarePaginator $movements, array $filters): array
+    {
+        $balances = [];
+        $opening = $this->baseQuery($filters)
+            ->when(filled($filters['date_from'] ?? null), fn (Builder $query) => $query->where($this->movementDateFilter('<', $filters['date_from'])))
+            ->get();
+
+        $offset = max(0, ($movements->currentPage() - 1) * $movements->perPage());
+        $previousPage = $offset === 0 ? collect() : $this->baseQuery($filters)
+            ->when(filled($filters['date_from'] ?? null), fn (Builder $query) => $query->where($this->movementDateFilter('>=', $filters['date_from'])))
+            ->when(filled($filters['date_to'] ?? null), fn (Builder $query) => $query->where($this->movementDateFilter('<=', $filters['date_to'])))
+            ->orderByRaw('COALESCE(transaction_date, movement_date) ASC')
+            ->orderBy('id')
+            ->limit($offset)
+            ->get();
+
+        foreach ($opening->concat($previousPage) as $movement) {
+            $key = $this->contextKey($movement, $filters);
+            $balances[$key] = ($balances[$key] ?? 0.0) + $this->inQty($movement) - $this->outQty($movement);
+        }
+
+        return $balances;
+    }
+
+    private function contextKey(StockMovement $movement, array $filters): string
+    {
+        $key = $movement->item_id.'|'.$movement->warehouse_id;
+
+        return ($filters['batch_no'] ?? '__all') === '__all'
+            ? $key
+            : $key.'|'.(filled($movement->batch_no) ? $movement->batch_no : '__no_batch');
     }
 
     private function sumDelta(Builder|Collection $movements): float
@@ -304,23 +353,21 @@ class InventoryLedgerService
         $type = $this->normalizedType($movement);
 
         return match (true) {
-            in_array($type, ['IN', 'RCV', 'PURCHASE-RECEIVE'], true) => 'receive',
+            in_array($type, ['IN', 'RCV', 'RECEIVE', 'PURCHASE-RECEIVE'], true) => 'receive',
             in_array($type, ['OUT', 'DO', 'SALE-DELIVERY', 'SERVICE'], true) => 'issue',
             str_starts_with($type, 'TRF') || str_starts_with($type, 'TRANSFER') => 'transfer',
             str_starts_with($type, 'ADJ') || str_starts_with($type, 'ADJUSTMENT') => 'adjustment',
+            str_starts_with($type, 'BATCH-ASSIGNMENT') => 'adjustment',
             default => 'opening',
         };
     }
 
     private function movementLabel(StockMovement $movement): string
     {
-        return match ($this->movementCategory($movement)) {
-            'receive' => 'Receive',
-            'issue' => 'Issue',
-            'transfer' => 'Transfer',
-            'adjustment' => 'Adjustment',
-            default => str($movement->transaction_type ?: $movement->movement_type ?: 'Opening')->replace(['_', '-'], ' ')->title()->toString(),
-        };
+        return str($movement->transaction_type ?: $movement->movement_type ?: 'Reference')
+            ->replace(['_', '-'], ' ')
+            ->upper()
+            ->toString();
     }
 
     private function documentType(StockMovement $movement): string
@@ -335,7 +382,8 @@ class InventoryLedgerService
     {
         $routeName = match ($this->normalizedType($movement)) {
             'RCV', 'PURCHASE-RECEIVE' => 'receivings.show',
-            'ADJ-IN', 'ADJ-OUT' => 'stock-adjustments.show',
+            'ADJ-IN', 'ADJ-OUT', 'ADJUSTMENT-IN', 'ADJUSTMENT-OUT' => 'stock-adjustments.show',
+            'TRF-IN', 'TRF-OUT', 'TRANSFER-IN', 'TRANSFER-OUT' => 'warehouse-transfers.show',
             default => null,
         };
 

@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\StockAdjustment;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StockAdjustmentRequest extends FormRequest
 {
@@ -17,7 +19,8 @@ class StockAdjustmentRequest extends FormRequest
             'branch_id' => ['required', 'exists:branches,id'],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'adjustment_date' => ['required', 'date'],
-            'reason' => ['required', 'string', 'max:1000'],
+            'reason_code' => ['required', Rule::in(StockAdjustment::REASON_CODES)],
+            'reason' => ['nullable', 'string', 'max:1000'],
             'notes' => ['nullable', 'string'],
             'action' => ['nullable', 'in:draft,post'],
             'lines' => ['required', 'array', 'min:1'],

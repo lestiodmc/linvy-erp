@@ -15,12 +15,13 @@
 
         <x-ui.filter-toolbar
             :action="route('stock-adjustments.index')"
-            columns="lg:grid-cols-[minmax(14rem,1.4fr)_9rem_9rem_12rem_12rem_10rem_7rem_6rem]"
+            columns="lg:grid-cols-[minmax(14rem,1.4fr)_9rem_9rem_12rem_12rem_11rem_10rem_7rem_6rem]"
         >
             <x-ui.search-input :value="$filters['keyword'] ?? ''" />
             <x-ui.date-range :from="$filters['date_from'] ?? ''" :to="$filters['date_to'] ?? ''" />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches->pluck('name', 'id')->all()" all-label="All branches" />
             <x-ui.warehouse-filter :warehouses="$warehouses" :value="$filters['warehouse_id'] ?? ''" />
+            <x-ui.select-filter name="reason_code" label="Reason" :value="$filters['reason_code'] ?? ''" :options="$reasonCodes" all-label="All reasons" />
             <x-ui.select-filter
                 name="status"
                 label="Status"
@@ -48,14 +49,17 @@
             </x-slot:head>
 
             @forelse($records as $record)
+                @php($reasonLabel = $reasonCodes[$record->reason_code] ?? str($record->reason_code ?: $record->reason ?: '-')->replace('_', ' ')->title()->toString())
                 <tr class="hover:bg-slate-50">
                     <td class="px-5 py-4 font-bold text-slate-900">{{ $record->number }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->adjustment_date?->format('Y-m-d') }}</td>
                     <td class="px-5 py-4 text-slate-600">
                         <div class="font-semibold text-slate-900">{{ $record->warehouse?->name }}</div>
-                        <div class="text-xs text-slate-500">{{ $record->branch?->name }}</div>
+                        <div class="text-xs text-slate-500">{{ $record->company?->name ?: '-' }} / {{ $record->branch?->name ?: '-' }}</div>
                     </td>
-                    <td class="px-5 py-4 text-slate-600">{{ str($record->reason)->limit(60) }}</td>
+                    <td class="px-5 py-4">
+                        <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700 ring-1 ring-blue-100">{{ $reasonLabel }}</span>
+                    </td>
                     <td class="px-5 py-4"><x-ui.status-badge :status="$record->status" /></td>
                     <td class="px-5 py-4 text-right font-semibold text-slate-700">{{ $record->lines_count }}</td>
                     <td class="px-5 py-4 text-slate-600">{{ $record->createdBy?->name ?: '-' }}</td>

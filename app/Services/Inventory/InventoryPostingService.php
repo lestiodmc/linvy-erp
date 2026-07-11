@@ -162,6 +162,16 @@ class InventoryPostingService
             $oldAverageCost = (float) ($balance->average_cost ?? 0);
             $movementQty = (float) $data['base_qty'];
             $unitCost = (float) ($data['unit_cost'] ?? 0);
+            $item = Item::find($data['item_id']);
+
+            if (
+                $data['movement_type'] === StockMovement::MOVEMENT_OUT
+                && $item
+                && ! (bool) $item->allow_negative_stock
+                && $oldQty < $movementQty
+            ) {
+                throw new RuntimeException('Insufficient stock.');
+            }
 
             if ($data['movement_type'] === StockMovement::MOVEMENT_IN) {
                 $newQty = $oldQty + $movementQty;
@@ -195,7 +205,6 @@ class InventoryPostingService
 
             $balance->save();
 
-            $item = Item::find($data['item_id']);
             if ($item && ((bool) $item->is_batch_tracked || (bool) $item->has_expiry_date)) {
                 $this->updateStockBatchBalance($data);
             }
@@ -227,6 +236,20 @@ class InventoryPostingService
             ->first();
 
         if (! $batchBalance) {
+            $batchBalance = StockBatchBalance::query()
+                ->where('warehouse_id', $data['warehouse_id'])
+                ->where('item_id', $data['item_id'])
+                ->where('batch_no', $batchNo)
+                ->where(function ($query) use ($data): void {
+                    filled($data['expiry_date'] ?? null)
+                        ? $query->whereDate('expiry_date', $data['expiry_date'])
+                        : $query->whereNull('expiry_date');
+                })
+                ->lockForUpdate()
+                ->first();
+        }
+
+        if (! $batchBalance) {
             $batchBalance = new StockBatchBalance([
                 'company_id' => $data['company_id'],
                 'branch_id' => $data['branch_id'],
@@ -242,6 +265,17 @@ class InventoryPostingService
 
         $oldQty = (float) ($batchBalance->qty_on_hand ?? 0);
         $movementQty = (float) $data['base_qty'];
+        $item = Item::find($data['item_id']);
+
+        if (
+            $data['movement_type'] === StockMovement::MOVEMENT_OUT
+            && $item
+            && ! (bool) $item->allow_negative_stock
+            && $oldQty < $movementQty
+        ) {
+            throw new RuntimeException('Insufficient batch stock.');
+        }
+
         $newQty = $data['movement_type'] === StockMovement::MOVEMENT_IN
             ? $oldQty + $movementQty
             : $oldQty - $movementQty;
@@ -307,6 +341,13 @@ class InventoryPostingService
                 ->where('item_id', $data['item_id'])
                 ->first();
 
+            if (! $balance) {
+                $balance = StockBalance::query()
+                    ->where('warehouse_id', $data['warehouse_id'])
+                    ->where('item_id', $data['item_id'])
+                    ->first();
+            }
+
             $currentNewQty = (float) ($balance?->qty_on_hand ?? 0);
             $currentLegacyQty = (float) ($balance?->quantity_on_hand ?? 0);
             $currentQty = $currentNewQty !== 0.0 ? $currentNewQty : $currentLegacyQty;
@@ -338,6 +379,19 @@ class InventoryPostingService
                                 : $query->whereNull('expiry_date');
                         })
                         ->first();
+
+                    if (! $batchBalance) {
+                        $batchBalance = StockBatchBalance::query()
+                            ->where('warehouse_id', $data['warehouse_id'])
+                            ->where('item_id', $data['item_id'])
+                            ->where('batch_no', $batchNo)
+                            ->where(function ($query) use ($data): void {
+                                filled($data['expiry_date'] ?? null)
+                                    ? $query->whereDate('expiry_date', $data['expiry_date'])
+                                    : $query->whereNull('expiry_date');
+                            })
+                            ->first();
+                    }
 
                     $batchQty = (float) ($batchBalance?->qty_on_hand ?? 0);
                 }

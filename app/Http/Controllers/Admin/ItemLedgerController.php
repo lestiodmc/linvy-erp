@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Inventory\ItemLedgerRequest;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Inventory\StockBatchBalance;
@@ -11,6 +12,7 @@ use App\Models\Warehouse;
 use App\Services\Inventory\InventoryLedgerService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class ItemLedgerController extends Controller
@@ -19,7 +21,7 @@ class ItemLedgerController extends Controller
     {
     }
 
-    public function index(Request $request): View
+    public function index(ItemLedgerRequest $request): View
     {
         $filters = $this->filters($request);
         $openingBalance = $this->inventoryLedgerService->getOpeningBalance($filters);
@@ -31,8 +33,8 @@ class ItemLedgerController extends Controller
             'openingBalance' => $openingBalance,
             'movements' => $movements,
             'ledger' => $ledger,
-            'companies' => Company::orderBy('name')->pluck('name', 'id')->all(),
-            'branches' => Branch::orderBy('name')->pluck('name', 'id')->all(),
+            'companies' => Company::whereIn('id', $this->accessibleBranches()->pluck('company_id'))->orderBy('name')->pluck('name', 'id')->all(),
+            'branches' => $this->accessibleBranches()->pluck('name', 'id')->all(),
             'warehouses' => $this->warehouseRecords(),
             'batches' => $this->batchOptions($filters),
             'items' => Item::where('track_inventory', true)
@@ -68,12 +70,14 @@ class ItemLedgerController extends Controller
             'item_id',
             'sku',
             'movement_type',
+            'reference',
             'batch_no',
             'date_from',
             'date_to',
         ]);
 
         $filters['batch_no'] = $filters['batch_no'] ?? '__all';
+        $filters['accessible_branch_ids'] = $this->accessibleBranches()->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         if (! $request->has('date_from')) {
             $filters['date_from'] = now()->startOfMonth()->toDateString();
@@ -90,11 +94,16 @@ class ItemLedgerController extends Controller
     {
         return collect([
             'RCV',
+            'RECEIVE',
             'IN',
             'OUT',
             'PURCHASE_RECEIVE',
+            'TRANSFER_IN',
+            'TRANSFER_OUT',
             'TRF-IN',
             'TRF-OUT',
+            'ADJUSTMENT_IN',
+            'ADJUSTMENT_OUT',
             'ADJ-IN',
             'ADJ-OUT',
             'DO',
@@ -119,6 +128,7 @@ class ItemLedgerController extends Controller
 
         $batches = StockBatchBalance::query()
             ->where('item_id', $filters['item_id'])
+            ->whereIn('branch_id', $filters['accessible_branch_ids'])
             ->when(filled($filters['company_id'] ?? null), fn ($query) => $query->where('company_id', $filters['company_id']))
             ->when(filled($filters['branch_id'] ?? null), fn ($query) => $query->where('branch_id', $filters['branch_id']))
             ->when(filled($filters['warehouse_id'] ?? null), fn ($query) => $query->where('warehouse_id', $filters['warehouse_id']))
@@ -138,7 +148,17 @@ class ItemLedgerController extends Controller
     private function warehouseRecords()
     {
         return Warehouse::with('branch')
+            ->whereIn('branch_id', $this->accessibleBranches()->pluck('id'))
             ->orderBy('branch_id')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function accessibleBranches()
+    {
+        return Branch::query()
+            ->where('is_active', true)
+            ->when(! Auth::user()?->isSuperAdmin(), fn ($query) => $query->whereHas('users', fn ($users) => $users->whereKey(Auth::id())))
             ->orderBy('name')
             ->get();
     }

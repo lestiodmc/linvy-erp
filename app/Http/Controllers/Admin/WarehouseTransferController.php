@@ -104,8 +104,14 @@ class WarehouseTransferController extends Controller
 
         $movements = StockMovement::query()
             ->with(['warehouse', 'item', 'uom', 'createdBy'])
-            ->where('transaction_id', $record->id)
-            ->whereIn('transaction_type', [StockMovement::TRANSACTION_TRF_OUT, StockMovement::TRANSACTION_TRF_IN])
+            ->where('reference_type', WarehouseTransfer::class)
+            ->where('reference_id', $record->id)
+            ->whereIn('transaction_type', [
+                StockMovement::TRANSACTION_TRF_OUT,
+                StockMovement::TRANSACTION_TRF_IN,
+                StockMovement::LEGACY_TRANSACTION_TRF_OUT,
+                StockMovement::LEGACY_TRANSACTION_TRF_IN,
+            ])
             ->orderBy('id')
             ->get();
 
@@ -179,11 +185,17 @@ class WarehouseTransferController extends Controller
             return response()->json([]);
         }
 
+        $warehouse = $this->accessibleWarehouse($warehouseId);
+
+        if (! $warehouse) {
+            return response()->json([]);
+        }
+
         $items = Item::query()
             ->with(['baseUnit:id,code,name', 'unitOfMeasure:id,code,name'])
-            ->whereHas('stockBalances', function (Builder $balance) use ($warehouseId): void {
+            ->whereHas('stockBalances', function (Builder $balance) use ($warehouse): void {
                 $balance
-                    ->where('warehouse_id', $warehouseId)
+                    ->where('warehouse_id', $warehouse->id)
                     ->where('qty_on_hand', '>', 0);
             })
             ->where('track_inventory', true)
@@ -230,11 +242,19 @@ class WarehouseTransferController extends Controller
             'expiry_date' => ['nullable', 'date'],
         ]);
 
+        $warehouse = $this->accessibleWarehouse((int) $data['warehouse_id']);
+
+        if (! $warehouse) {
+            throw ValidationException::withMessages([
+                'warehouse_id' => 'You do not have access to this warehouse.',
+            ]);
+        }
+
         $item = Item::query()->with(['baseUnit:id,code,name', 'unitOfMeasure:id,code,name'])->findOrFail($data['item_id']);
 
         return response()->json($this->warehouseTransferPostingService->itemInfo(
             $item,
-            (int) $data['warehouse_id'],
+            $warehouse->id,
             $data['batch_no'] ?? null,
             $data['expiry_date'] ?? null
         ));
@@ -257,12 +277,20 @@ class WarehouseTransferController extends Controller
         }
 
         $warehouseId = (int) $data['warehouse_id'];
+        $warehouse = $this->accessibleWarehouse($warehouseId);
+
+        if (! $warehouse) {
+            throw ValidationException::withMessages([
+                'warehouse_id' => 'You do not have access to this warehouse.',
+            ]);
+        }
+
         $balances = StockBalance::query()
-            ->where('warehouse_id', $warehouseId)
+            ->where('warehouse_id', $warehouse->id)
             ->where('qty_on_hand', '>', 0);
 
         $lastMovement = StockMovement::query()
-            ->where('warehouse_id', $warehouseId)
+            ->where('warehouse_id', $warehouse->id)
             ->latest('created_at')
             ->value('created_at');
 
@@ -341,6 +369,17 @@ class WarehouseTransferController extends Controller
             ->orderBy('branch_id')
             ->orderBy('name')
             ->get();
+    }
+
+    private function accessibleWarehouse(int $warehouseId): ?Warehouse
+    {
+        $branchIds = $this->accessibleBranches()->pluck('id');
+
+        return Warehouse::query()
+            ->whereKey($warehouseId)
+            ->where('is_active', true)
+            ->whereIn('branch_id', $branchIds)
+            ->first();
     }
 
     private function accessibleBranches()

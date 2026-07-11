@@ -89,8 +89,14 @@ class WarehouseTransferPostingService
 
                 if (
                     StockMovement::query()
-                        ->whereIn('transaction_type', [StockMovement::TRANSACTION_TRF_IN, StockMovement::TRANSACTION_TRF_OUT])
-                        ->where('transaction_id', $record->id)
+                        ->where('reference_type', WarehouseTransfer::class)
+                        ->where('reference_id', $record->id)
+                        ->whereIn('transaction_type', [
+                            StockMovement::TRANSACTION_TRF_IN,
+                            StockMovement::TRANSACTION_TRF_OUT,
+                            StockMovement::LEGACY_TRANSACTION_TRF_IN,
+                            StockMovement::LEGACY_TRANSACTION_TRF_OUT,
+                        ])
                         ->exists()
                 ) {
                     throw ValidationException::withMessages([
@@ -110,9 +116,7 @@ class WarehouseTransferPostingService
                     $unitCost = (float) ($item->standard_cost ?? 0);
                     $uomId = $line->unit_of_measure_id ?: $item->base_unit_id ?: $item->unit_of_measure_id;
                     $baseUomId = $item->base_unit_id ?: $item->unit_of_measure_id;
-                    $batchNo = ((bool) $item->is_batch_tracked || (bool) $item->has_expiry_date) && blank($line->batch_no)
-                        ? 'NO_BATCH'
-                        : $line->batch_no;
+                    $batchNo = (bool) $item->is_batch_tracked ? $line->batch_no : null;
 
                     $baseMovement = [
                         'company_id' => $record->company_id,
@@ -250,9 +254,7 @@ class WarehouseTransferPostingService
 
             $record->lines()->create([
                 'item_id' => $item->id,
-                'batch_no' => ((bool) $item->is_batch_tracked || (bool) $item->has_expiry_date) && blank($line['batch_no'] ?? null)
-                    ? 'NO_BATCH'
-                    : ($line['batch_no'] ?? null),
+                'batch_no' => (bool) $item->is_batch_tracked ? ($line['batch_no'] ?? null) : null,
                 'expiry_date' => $line['expiry_date'] ?? null,
                 'quantity' => $line['quantity'],
                 'unit_of_measure_id' => $uomId,
@@ -310,6 +312,10 @@ class WarehouseTransferPostingService
                 if ((bool) $item->has_expiry_date && blank($batch->expiry_date)) {
                     throw ValidationException::withMessages(["$prefix.expiry_date" => 'Selected batch does not have an expiry date.']);
                 }
+
+                if (filled($line['expiry_date'] ?? null) && $batch->expiry_date?->format('Y-m-d') !== $line['expiry_date']) {
+                    throw ValidationException::withMessages(["$prefix.expiry_date" => 'Expiry date must follow the selected batch.']);
+                }
             }
 
             $qty = (float) ($line['quantity'] ?? 0);
@@ -361,9 +367,9 @@ class WarehouseTransferPostingService
             ->where('batch_no', $batchNo)
             ->where('qty_on_hand', '>', 0);
 
-        if (filled($expiryDate)) {
-            $query->whereDate('expiry_date', $expiryDate);
-        }
+        filled($expiryDate)
+            ? $query->whereDate('expiry_date', $expiryDate)
+            : $query->whereNull('expiry_date');
 
         return $query->first();
     }

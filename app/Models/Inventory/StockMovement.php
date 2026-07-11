@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 
 class StockMovement extends Model
 {
@@ -17,10 +18,14 @@ class StockMovement extends Model
     public const MOVEMENT_OUT = 'OUT';
 
     public const TRANSACTION_RCV = 'RCV';
-    public const TRANSACTION_ADJ_IN = 'ADJ-IN';
-    public const TRANSACTION_ADJ_OUT = 'ADJ-OUT';
-    public const TRANSACTION_TRF_IN = 'TRF-IN';
-    public const TRANSACTION_TRF_OUT = 'TRF-OUT';
+    public const TRANSACTION_ADJ_IN = 'ADJUSTMENT_IN';
+    public const TRANSACTION_ADJ_OUT = 'ADJUSTMENT_OUT';
+    public const LEGACY_TRANSACTION_ADJ_IN = 'ADJ-IN';
+    public const LEGACY_TRANSACTION_ADJ_OUT = 'ADJ-OUT';
+    public const TRANSACTION_TRF_IN = 'TRANSFER_IN';
+    public const TRANSACTION_TRF_OUT = 'TRANSFER_OUT';
+    public const LEGACY_TRANSACTION_TRF_IN = 'TRF-IN';
+    public const LEGACY_TRANSACTION_TRF_OUT = 'TRF-OUT';
     public const TRANSACTION_DO = 'DO';
     public const TRANSACTION_SERVICE = 'SERVICE';
     public const TRANSACTION_RETURN_IN = 'RETURN-IN';
@@ -109,5 +114,55 @@ class StockMovement extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Restrict movements to warehouses owned by the permitted branches.
+     *
+     * The warehouse relationship is the authoritative fallback for legacy
+     * movements which were created before company_id and branch_id were
+     * consistently populated. Requiring an accessible warehouse prevents a
+     * legacy NULL branch from bypassing branch access.
+     */
+    public function scopeAccessibleFromBranches(Builder $query, array $branchIds): Builder
+    {
+        return $query
+            ->whereHas('warehouse', fn (Builder $warehouse) => $warehouse->whereIn('branch_id', $branchIds))
+            ->where(function (Builder $movement) use ($branchIds): void {
+                $movement->whereIn('branch_id', $branchIds)
+                    ->orWhereNull('branch_id');
+            });
+    }
+
+    /**
+     * Apply a branch filter without hiding legacy movements whose branch is
+     * NULL but whose warehouse belongs to the requested branch.
+     */
+    public function scopeForBranch(Builder $query, int $branchId): Builder
+    {
+        return $query->where(function (Builder $movement) use ($branchId): void {
+            $movement->where('branch_id', $branchId)
+                ->orWhere(function (Builder $legacy) use ($branchId): void {
+                    $legacy->whereNull('branch_id')
+                        ->whereHas('warehouse', fn (Builder $warehouse) => $warehouse->where('branch_id', $branchId));
+                });
+        });
+    }
+
+    /**
+     * Apply a company filter with a warehouse/branch fallback for legacy NULL
+     * company values. A populated movement company remains authoritative.
+     */
+    public function scopeForCompany(Builder $query, int $companyId): Builder
+    {
+        return $query->where(function (Builder $movement) use ($companyId): void {
+            $movement->where('company_id', $companyId)
+                ->orWhere(function (Builder $legacy) use ($companyId): void {
+                    $legacy->whereNull('company_id')
+                        ->whereHas('warehouse', fn (Builder $warehouse) => $warehouse
+                            ->where('company_id', $companyId)
+                            ->orWhereHas('branch', fn (Builder $branch) => $branch->where('company_id', $companyId)));
+                });
+        });
     }
 }

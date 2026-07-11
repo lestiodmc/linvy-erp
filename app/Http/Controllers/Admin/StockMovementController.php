@@ -7,6 +7,8 @@ use App\Models\Company;
 use App\Models\ItemCategory;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class StockMovementController extends ResourceController
@@ -24,6 +26,7 @@ class StockMovementController extends ResourceController
         $filters = $this->filters();
 
         $records = StockMovement::query()
+            ->accessibleFromBranches($this->accessibleBranches()->pluck('id')->map(fn ($id) => (int) $id)->all())
             ->with(['company', 'branch', 'warehouse.branch', 'warehouse.company', 'item.category', 'item.baseUnit', 'uom'])
             ->when(filled($filters['keyword'] ?? null), function ($query) use ($filters): void {
                 $keyword = $filters['keyword'];
@@ -45,8 +48,8 @@ class StockMovementController extends ResourceController
                 $dateQuery->whereDate('transaction_date', '<=', $filters['date_to'])
                     ->orWhereDate('movement_date', '<=', $filters['date_to']);
             }))
-            ->when(filled($filters['company_id'] ?? null), fn ($query) => $query->where('company_id', $filters['company_id']))
-            ->when(filled($filters['branch_id'] ?? null), fn ($query) => $query->where('branch_id', $filters['branch_id']))
+            ->when(filled($filters['company_id'] ?? null), fn ($query) => $query->forCompany((int) $filters['company_id']))
+            ->when(filled($filters['branch_id'] ?? null), fn ($query) => $query->forBranch((int) $filters['branch_id']))
             ->when(filled($filters['warehouse_id'] ?? null), fn ($query) => $query->where('warehouse_id', $filters['warehouse_id']))
             ->when(filled($filters['movement_type'] ?? null), function ($query) use ($filters): void {
                 $query->where(function ($movementQuery) use ($filters): void {
@@ -63,8 +66,8 @@ class StockMovementController extends ResourceController
         return view('inventory.stock_movements.index', [
             'records' => $records,
             'filters' => $filters,
-            'companies' => Company::orderBy('name')->pluck('name', 'id')->all(),
-            'branches' => Branch::orderBy('name')->pluck('name', 'id')->all(),
+            'companies' => Company::whereIn('id', $this->accessibleBranches()->pluck('company_id'))->orderBy('name')->pluck('name', 'id')->all(),
+            'branches' => $this->accessibleBranches()->pluck('name', 'id')->all(),
             'warehouses' => $this->warehouseRecords(),
             'movementTypes' => $this->movementTypes(),
             'itemCategories' => ItemCategory::orderBy('name')->pluck('name', 'id')->all(),
@@ -94,8 +97,12 @@ class StockMovementController extends ResourceController
             'IN',
             'OUT',
             'PURCHASE_RECEIVE',
+            'TRANSFER_IN',
+            'TRANSFER_OUT',
             'TRF-IN',
             'TRF-OUT',
+            'ADJUSTMENT_IN',
+            'ADJUSTMENT_OUT',
             'ADJ-IN',
             'ADJ-OUT',
             'DO',
@@ -108,7 +115,17 @@ class StockMovementController extends ResourceController
     private function warehouseRecords()
     {
         return Warehouse::with('branch')
+            ->whereIn('branch_id', $this->accessibleBranches()->pluck('id'))
             ->orderBy('branch_id')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function accessibleBranches()
+    {
+        return Branch::query()
+            ->where('is_active', true)
+            ->when(! Auth::user()?->isSuperAdmin(), fn (Builder $query) => $query->whereHas('users', fn (Builder $users) => $users->whereKey(Auth::id())))
             ->orderBy('name')
             ->get();
     }
