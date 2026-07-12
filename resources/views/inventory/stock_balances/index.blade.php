@@ -10,7 +10,7 @@
         $stockBadge = function ($row) use ($onHand) { $value = $onHand($row); $min = (float) ($row->item?->minimum_order_qty ?? 0); return $value < 0 ? ['NEGATIVE', 'bg-red-50 text-red-700 ring-red-100'] : ($value == 0 ? ['ZERO', 'bg-slate-100 text-slate-700 ring-slate-200'] : ($min > 0 && $value <= $min ? ['LOW', 'bg-amber-50 text-amber-700 ring-amber-100'] : ['IN STOCK', 'bg-emerald-50 text-emerald-700 ring-emerald-100'])); };
     @endphp
     <div class="mx-auto max-w-screen-2xl">
-        <x-ui.filter-toolbar :action="route('stock-balances.index')" columns="lg:grid-cols-[minmax(13rem,1.3fr)_minmax(9rem,1fr)_minmax(9rem,1fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_9rem_9rem_9rem_7rem_6rem]">
+        <x-filter.panel :action="route('stock-balances.index')">
             <x-ui.search-input :value="$filters['keyword'] ?? ''" />
             <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies" all-label="All companies" />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches" all-label="All branches" />
@@ -19,8 +19,8 @@
             <x-ui.select-filter name="stock_status" label="Stock status" :value="$filters['stock_status'] ?? ''" :options="$stockStatuses" all-label="All stock" />
             <x-ui.select-filter name="batch_tracking" label="Batch tracking" :value="$filters['batch_tracking'] ?? ''" :options="$batchTrackingOptions" all-label="All items" />
             <x-ui.select-filter name="reconciliation_status" label="Reconciliation" :value="$filters['reconciliation_status'] ?? ''" :options="$reconciliationStatuses" all-label="All" />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Apply</button><a href="{{ route('stock-balances.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700">Reset</a>
-        </x-ui.filter-toolbar>
+            <x-slot:actions><button class="button-primary">Apply Filters</button><x-filter.reset :href="route('stock-balances.index')" /></x-slot:actions>
+        </x-filter.panel>
         <x-ui.data-table class="rounded-lg shadow-none"><x-slot:head><tr>
             <th class="{{ $head }}">Company</th><th class="{{ $head }}">Branch</th><th class="{{ $head }}">Warehouse</th><th class="{{ $head }}">SKU</th><th class="{{ $head }}">Item Name</th><th class="{{ $head }}">Category</th><th class="{{ $head }}">Batch</th><th class="{{ $head }} text-right">On Hand</th><th class="{{ $head }} text-right">Reserved</th><th class="{{ $head }} text-right">Available</th><th class="{{ $head }}">UOM</th><th class="{{ $head }}">Stock Status</th><th class="{{ $head }}">Last Updated</th><th class="{{ $head }}">Action</th>
         </tr></x-slot:head>

@@ -73,4 +73,10 @@ class User extends Authenticatable
 
         return in_array('*', $permissions, true) || in_array($module, $permissions, true);
     }
+
+    public function canPerform(string $permission, ?string $fallbackModule = null): bool
+    {
+        $permissions = $this->role?->permissions ?? [];
+        return $this->isSuperAdmin() || in_array($permission, $permissions, true) || ($fallbackModule && in_array($fallbackModule, $permissions, true));
+    }
 }

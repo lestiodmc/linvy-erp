@@ -68,7 +68,7 @@ return [
         'production' => [
             'label' => 'Production',
             'items' => [
-                ['label' => 'Repacking / Production Orders', 'route' => 'productions.index', 'routes' => ['productions.*']],
+                ['label' => 'Production Formulas', 'route' => 'production-formulas.index', 'routes' => ['production-formulas.*']],
             ],
         ],
         'sales' => [

@@ -12,7 +12,7 @@
                     <a href="{{ route('purchase-orders.edit', $record) }}" class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100">Edit</a>
                     <form method="POST" action="{{ route('purchase-orders.submit', $record) }}">
                         @csrf
-                        <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Submit</button>
+                        <button type="submit" class="button-primary">Submit</button>
                     </form>
                     <form method="POST" action="{{ route('purchase-orders.cancel', $record) }}">
                         @csrf
@@ -36,7 +36,7 @@
                 @endif
 
                 @if(in_array($record->status, ['approved', 'partially_received'], true) && $record->lines->contains(fn ($line) => (float) $line->remaining_quantity > 0))
-                    <a href="{{ route('receivings.create-from-po', $record) }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Create Receiving</a>
+                    <a href="{{ route('receivings.create-from-po', $record) }}" class="button-primary">Create Receiving</a>
                 @endif
 
                 @if($record->status === 'approved')

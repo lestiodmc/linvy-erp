@@ -35,6 +35,18 @@ This checklist supports the architecture in [PROJECT_ARCHITECTURE.md](PROJECT_AR
 
 ## Purchase
 
+## Production Formula Phase 1
+
+- [x] Versioned Formula/BOM with company and optional branch applicability
+- [x] STANDARD/REPACKING production type and one main output
+- [x] Proportional/fixed material lines and requirement preview
+- [x] Default source/destination and line source override
+- [x] Draft/active/inactive lifecycle and clone workflow
+- [x] Multi-company/branch/item/warehouse validation
+- [ ] Replace native Source Warehouse select with reusable searchable warehouse autocomplete
+
+Production Orders, reservation, material issues, execution, QC, finished-goods receipts, stock posting, and batch genealogy remain future phases.
+
 - [ ] Purchase Request workflow
 - [ ] Purchase Request approval levels
 - [ ] Purchase Order workflow

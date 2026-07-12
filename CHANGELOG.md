@@ -19,6 +19,13 @@ This project follows the architecture and long-term direction defined in [PROJEC
 
 ### In Progress
 
+### Production Formula Phase 1 checkpoint
+
+- Completed versioned Production Formula/BOM with STANDARD and REPACKING types, one main output, proportional/fixed material lines, effective periods, default and line warehouse sources, requirement preview, and draft/active/inactive lifecycle.
+- Added company/optional branch applicability, branch-scoped access validation, automatic numbering/versioning, cloning, and item/UOM eligibility validation.
+- Formula stage creates no inventory posting or stock movement.
+- Non-blocking backlog: replace native Source Warehouse selects with reusable searchable warehouse autocomplete.
+
 - Brand Master for item classification and future master data consistency.
 - Item Master enhancement for ERP-ready inventory, purchasing, sales, warehouse type defaults, and future accounting integration.
 

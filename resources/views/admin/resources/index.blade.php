@@ -6,7 +6,7 @@
                 <p class="mt-0.5 text-sm font-medium text-slate-500">Manage {{ str($title)->lower() }} records</p>
             </div>
             @if(count($fields) > 0)
-                <a href="{{ route($route.'.create') }}" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-sm shadow-emerald-900/10 hover:bg-emerald-700">New</a>
+                <a href="{{ route($route.'.create') }}" class="button-primary">New</a>
             @endif
         </div>
     </x-slot>

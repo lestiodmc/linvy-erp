@@ -12,7 +12,7 @@
                     <a href="{{ route('purchase-requests.edit', $record) }}" class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100">Edit</a>
                     <form method="POST" action="{{ route('purchase-requests.submit', $record) }}">
                         @csrf
-                        <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Submit</button>
+                        <button type="submit" class="button-primary">Submit</button>
                     </form>
                     <form method="POST" action="{{ route('purchase-requests.cancel', $record) }}">
                         @csrf
@@ -36,7 +36,7 @@
                 @endif
 
                 @if($record->status === 'approved')
-                    <a href="{{ route('purchase-orders.create-from-pr', $record) }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Convert to PO</a>
+                    <a href="{{ route('purchase-orders.create-from-pr', $record) }}" class="button-primary">Convert to PO</a>
                     <form method="POST" action="{{ route('purchase-requests.close', $record) }}">
                         @csrf
                         <button type="submit" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Close</button>

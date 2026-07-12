@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\DeliveryOrder;
 use App\Models\Item;
-use App\Models\Production;
 use App\Models\PurchaseOrder;
 use App\Models\Receiving;
 use App\Models\SalesOrder;
@@ -36,7 +35,7 @@ class DashboardController extends Controller
                 ['label' => 'New Sales Order', 'route' => 'sales-orders.create', 'module' => 'sales'],
                 ['label' => 'Warehouse Transfer', 'route' => 'warehouse-transfers.create', 'module' => 'inventory'],
                 ['label' => 'Stock Adjustment', 'route' => 'stock-adjustments.create', 'module' => 'inventory'],
-                ['label' => 'Repacking Order', 'route' => 'productions.create', 'module' => 'production'],
+                ['label' => 'New Production Formula', 'route' => 'production-formulas.create', 'module' => 'production'],
             ],
             'balances' => StockBalance::with(['item', 'warehouse'])->latest('updated_at')->limit(8)->get(),
             'recentDocuments' => $this->recentDocuments(),
@@ -109,16 +108,6 @@ class DashboardController extends Controller
                 'status' => $record->status,
                 'total' => null,
                 'route' => route('stock-adjustments.show', $record),
-                'created_at' => $record->created_at,
-            ]))
-            ->merge(Production::latest('created_at')->limit(4)->get()->map(fn ($record) => [
-                'type' => 'PRD',
-                'number' => $record->number,
-                'partner' => null,
-                'date' => $record->production_date,
-                'status' => $record->status,
-                'total' => null,
-                'route' => route('productions.show', $record),
                 'created_at' => $record->created_at,
             ]))
             ->sortByDesc('created_at')

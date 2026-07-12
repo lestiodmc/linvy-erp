@@ -26,14 +26,11 @@
             </div>
         @endif
 
-        <x-ui.filter-toolbar
-            :action="route('item-ledger.index')"
-            columns="lg:grid-cols-[minmax(9rem,1fr)_minmax(9rem,1fr)_minmax(10rem,1fr)_minmax(15rem,1.5fr)_8rem_minmax(9rem,1fr)_minmax(10rem,1fr)_9rem_9rem_6rem_6rem_8rem_7rem]"
-        >
+        <x-filter.panel :action="route('item-ledger.index')">
             <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies" all-label="All companies" />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches" all-label="All branches" />
             <x-ui.warehouse-filter :warehouses="$warehouses" :value="$filters['warehouse_id'] ?? ''" />
-            <x-ui.select-filter name="item_id" label="Item" :value="$filters['item_id'] ?? ''" :options="$items" all-label="Select item" />
+            <x-filter.field :span="2"><x-ui.select-filter name="item_id" label="Item" :value="$filters['item_id'] ?? ''" :options="$items" all-label="Select item" /></x-filter.field>
             <div>
                 <label class="sr-only" for="sku">SKU</label>
                 <input id="sku" name="sku" value="{{ $filters['sku'] ?? '' }}" placeholder="SKU" class="h-10 w-full rounded-lg border-slate-200 px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -45,11 +42,8 @@
                 <input id="reference" name="reference" value="{{ $filters['reference'] ?? '' }}" placeholder="Document no." class="h-10 w-full rounded-lg border-slate-200 px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500">
             </div>
             <x-ui.date-range :from="$filters['date_from'] ?? ''" :to="$filters['date_to'] ?? ''" />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Search</button>
-            <a href="{{ route('item-ledger.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Reset</a>
-            <a href="{{ route('item-ledger.export-excel', request()->query()) }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Excel</a>
-            <a href="{{ route('item-ledger.export-pdf', request()->query()) }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">PDF</a>
-        </x-ui.filter-toolbar>
+            <x-slot:actions><button class="button-primary">Search</button><x-filter.reset :href="route('item-ledger.index')" /><a href="{{ route('item-ledger.export-excel', request()->query()) }}" class="filter-button-secondary">Excel</a><a href="{{ route('item-ledger.export-pdf', request()->query()) }}" class="filter-button-secondary">PDF</a></x-slot:actions>
+        </x-filter.panel>
 
         @if(($filters['batch_no'] ?? '__all') === '__all')
             <p class="mb-2 text-sm font-medium text-slate-500">All Batch includes batch and No Batch stock.</p>
@@ -59,14 +53,18 @@
             <p class="mb-2 text-sm font-medium text-slate-500">Batch summary is limited to {{ $filters['batch_no'] }}.</p>
         @endif
 
+        @if($ledgerUom)
         <div class="mb-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             @foreach($summaryCards as $card)
                 <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
                     <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">{{ $card['label'] }}</p>
-                    <p class="mt-1 text-xl font-black {{ $card['class'] }}">{{ $formatQty($card['value']) }}</p>
+                    <p class="mt-1 text-xl font-black {{ $card['class'] }}">{{ $formatQty($card['value']) }} {{ $ledgerUom }}</p>
                 </div>
             @endforeach
         </div>
+        @elseif(filled($filters['sku'] ?? null))
+            <div class="theme-card mb-2 rounded-lg px-4 py-3 text-sm theme-muted">Quantity KPIs are available after selecting one item, preventing totals across incompatible UOMs.</div>
+        @endif
 
         <x-ui.data-table class="rounded-lg shadow-none">
             <x-slot:head>

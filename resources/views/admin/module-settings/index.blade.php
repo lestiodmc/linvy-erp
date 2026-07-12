@@ -54,7 +54,7 @@
                 </div>
 
                 <div class="flex justify-end border-t border-gray-100 bg-gray-50 px-6 py-4">
-                    <button type="submit" class="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800">Save Module Settings</button>
+                    <button type="submit" class="button-primary">Save Module Settings</button>
                 </div>
             </form>
         </div>

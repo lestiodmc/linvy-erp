@@ -21,6 +21,8 @@ class DocumentSequenceService
         'TRF' => 'WAREHOUSE_TRANSFER',
         'BAS' => 'BATCH_ASSIGNMENT',
         'PRD' => 'PRODUCTION_ORDER',
+        'BOM' => 'PRODUCTION_BOM',
+        'production_bom' => 'PRODUCTION_BOM',
         'purchase_request' => 'PURCHASE_REQUEST',
         'purchase_order' => 'PURCHASE_ORDER',
         'receiving' => 'GOODS_RECEIPT',

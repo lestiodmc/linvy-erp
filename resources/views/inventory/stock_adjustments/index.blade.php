@@ -13,10 +13,7 @@
     <div class="mx-auto max-w-screen-2xl">
         @include('purchase.shared.flash')
 
-        <x-ui.filter-toolbar
-            :action="route('stock-adjustments.index')"
-            columns="lg:grid-cols-[minmax(14rem,1.4fr)_9rem_9rem_12rem_12rem_11rem_10rem_7rem_6rem]"
-        >
+        <x-filter.panel :action="route('stock-adjustments.index')">
             <x-ui.search-input :value="$filters['keyword'] ?? ''" />
             <x-ui.date-range :from="$filters['date_from'] ?? ''" :to="$filters['date_to'] ?? ''" />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches->pluck('name', 'id')->all()" all-label="All branches" />
@@ -29,9 +26,8 @@
                 :options="collect($statuses)->mapWithKeys(fn ($status) => [$status => str($status)->title()->toString()])->all()"
                 all-label="All status"
             />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Apply</button>
-            <a href="{{ route('stock-adjustments.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Reset</a>
-        </x-ui.filter-toolbar>
+            <x-slot:actions><button class="button-primary">Apply Filters</button><x-filter.reset :href="route('stock-adjustments.index')" /></x-slot:actions>
+        </x-filter.panel>
 
         <x-ui.data-table>
             <x-slot:head>

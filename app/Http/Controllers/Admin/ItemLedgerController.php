@@ -27,12 +27,16 @@ class ItemLedgerController extends Controller
         $openingBalance = $this->inventoryLedgerService->getOpeningBalance($filters);
         $movements = $this->inventoryLedgerService->getMovements($filters);
         $ledger = $this->inventoryLedgerService->calculateRunningBalance($movements, $openingBalance, $filters);
+        $ledgerUom = filled($filters['item_id'] ?? null)
+            ? Item::query()->with('baseUnit')->find($filters['item_id'])?->baseUnit?->code
+            : null;
 
         return view('inventory.item-ledger.index', [
             'filters' => $filters,
             'openingBalance' => $openingBalance,
             'movements' => $movements,
             'ledger' => $ledger,
+            'ledgerUom' => $ledgerUom,
             'companies' => Company::whereIn('id', $this->accessibleBranches()->pluck('company_id'))->orderBy('name')->pluck('name', 'id')->all(),
             'branches' => $this->accessibleBranches()->pluck('name', 'id')->all(),
             'warehouses' => $this->warehouseRecords(),

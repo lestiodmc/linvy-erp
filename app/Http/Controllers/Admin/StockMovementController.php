@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Support\InventoryMovementSource;
 
@@ -33,7 +34,7 @@ class StockMovementController extends ResourceController
         $branches = $this->accessibleBranches();
         $filters = $this->filters($branches);
         $query = $this->filteredQuery($filters, $branches);
-        $summary = $this->summary(clone $query, $filters);
+        $summary = $this->summary(clone $query);
         $records = $query->with(['company', 'branch', 'warehouse.branch', 'warehouse.company', 'item.category', 'item.baseUnit', 'uom', 'baseUom'])
             ->orderByRaw('COALESCE(transaction_date, movement_date) DESC')->orderByDesc('id')->paginate(15)->withQueryString();
 
@@ -78,7 +79,7 @@ class StockMovementController extends ResourceController
             ->when(($filters['direction'] ?? '') === 'IN', fn (Builder $query) => $query->where('quantity_in', '>', 0)->where('quantity_out', '<=', 0))
             ->when(($filters['direction'] ?? '') === 'OUT', fn (Builder $query) => $query->where('quantity_out', '>', 0)->where('quantity_in', '<=', 0))
             ->when(filled($filters['reference'] ?? null), fn (Builder $query) => $query->where(fn (Builder $reference) => $reference->where('transaction_number', 'like', '%'.$filters['reference'].'%')->orWhere('reference_number', 'like', '%'.$filters['reference'].'%')))
-            ->when(filled($filters['keyword'] ?? null), function (Builder $query) use ($filters): void { $term = '%'.$filters['keyword'].'%'; $query->where(fn (Builder $search) => $search->where('transaction_number', 'like', $term)->orWhere('reference_number', 'like', $term)->orWhere('batch_no', 'like', $term)->orWhere('notes', 'like', $term)->orWhere('remarks', 'like', $term)->orWhereHas('item', fn (Builder $item) => $item->where('sku', 'like', $term)->orWhere('name', 'like', $term))); })
+            ->when(filled($filters['keyword'] ?? null), function (Builder $query) use ($filters): void { $term = '%'.$filters['keyword'].'%'; $query->where(fn (Builder $search) => $search->where('stock_movements.transaction_number', 'like', $term)->orWhere('stock_movements.reference_number', 'like', $term)->orWhere('stock_movements.batch_no', 'like', $term)->orWhere('stock_movements.notes', 'like', $term)->orWhere('stock_movements.remarks', 'like', $term)->orWhereHas('item', fn (Builder $item) => $item->where('sku', 'like', $term)->orWhere('name', 'like', $term))); })
             ->when(filled($filters['date_from'] ?? null), fn (Builder $query) => $query->where(fn (Builder $date) => $date->whereDate('transaction_date', '>=', $filters['date_from'])->orWhere(fn (Builder $legacy) => $legacy->whereNull('transaction_date')->whereDate('movement_date', '>=', $filters['date_from']))))
             ->when(filled($filters['date_to'] ?? null), fn (Builder $query) => $query->where(fn (Builder $date) => $date->whereDate('transaction_date', '<=', $filters['date_to'])->orWhere(fn (Builder $legacy) => $legacy->whereNull('transaction_date')->whereDate('movement_date', '<=', $filters['date_to']))));
     }
@@ -98,5 +99,38 @@ class StockMovementController extends ResourceController
     private function warehouses(Collection $branches, mixed $companyId = null, mixed $branchId = null): Collection { return Warehouse::query()->with(['branch', 'company'])->where('is_active', true)->whereIn('branch_id', $branches->pluck('id'))->when(filled($branchId), fn (Builder $query) => $query->where('branch_id', $branchId))->when(filled($companyId), fn (Builder $query) => $query->where(fn (Builder $scope) => $scope->where('company_id', $companyId)->orWhere(fn (Builder $legacy) => $legacy->whereNull('company_id')->whereHas('branch', fn (Builder $branch) => $branch->where('company_id', $companyId)))))->orderBy('name')->get(); }
     private function itemOptions(Collection $branches): Collection { $ids = StockMovement::query()->accessibleFromBranches($branches->pluck('id')->all())->select('item_id')->distinct()->limit(500)->pluck('item_id'); return Item::query()->whereIn('id', $ids)->orderBy('sku')->get(['id', 'sku', 'name'])->mapWithKeys(fn (Item $item) => [$item->id => trim($item->sku.' - '.$item->name)]); }
     private function batchOptions(array $filters, Collection $branches): array { $query = StockMovement::query()->accessibleFromBranches($branches->pluck('id')->all())->when(filled($filters['company_id'] ?? null), fn (Builder $q) => $q->forCompany((int) $filters['company_id']))->when(filled($filters['branch_id'] ?? null), fn (Builder $q) => $q->forBranch((int) $filters['branch_id']))->when(filled($filters['warehouse_id'] ?? null), fn (Builder $q) => $q->where('warehouse_id', $filters['warehouse_id']))->when(filled($filters['item_id'] ?? null), fn (Builder $q) => $q->where('item_id', $filters['item_id'])); $options = ['__no_batch' => 'No Batch']; foreach ($query->whereNotNull('batch_no')->where('batch_no', '!=', '')->distinct()->orderBy('batch_no')->limit(500)->pluck('batch_no') as $batch) $options[$batch] = $batch; return $options; }
-    private function summary(Builder $query, array $filters): array { $totals = $query->selectRaw('COUNT(*) rows_count, COALESCE(SUM(quantity_in),0) total_in, COALESCE(SUM(quantity_out),0) total_out, SUM(CASE WHEN quantity_in > 0 AND quantity_out <= 0 THEN 1 ELSE 0 END) in_count, SUM(CASE WHEN quantity_out > 0 AND quantity_in <= 0 THEN 1 ELSE 0 END) out_count')->first(); $item = filled($filters['item_id'] ?? null) ? Item::with('baseUnit')->find($filters['item_id']) : null; return ['rows' => (int) $totals->rows_count, 'in' => (float) $totals->total_in, 'out' => (float) $totals->total_out, 'net' => (float) $totals->total_in - (float) $totals->total_out, 'in_count' => (int) $totals->in_count, 'out_count' => (int) $totals->out_count, 'uom' => $item?->baseUnit?->code, 'mixed' => ! $item]; }
+    private function summary(Builder $query): array
+    {
+        $uomId = 'COALESCE(stock_movements.base_uom_id, stock_movements.uom_id, items.base_unit_id)';
+        $groups = $query
+            ->leftJoin('items', 'items.id', '=', 'stock_movements.item_id')
+            ->leftJoin('units_of_measure', 'units_of_measure.id', '=', DB::raw($uomId))
+            ->selectRaw($uomId.' effective_uom_id, units_of_measure.code uom_code')
+            ->selectRaw('COUNT(*) rows_count, COALESCE(SUM(quantity_in), 0) total_in, COALESCE(SUM(quantity_out), 0) total_out')
+            ->selectRaw('SUM(CASE WHEN quantity_in > 0 AND quantity_out <= 0 THEN 1 ELSE 0 END) in_count')
+            ->selectRaw('SUM(CASE WHEN quantity_out > 0 AND quantity_in <= 0 THEN 1 ELSE 0 END) out_count')
+            ->groupByRaw($uomId.', units_of_measure.code')
+            ->orderBy('units_of_measure.code')
+            ->get()
+            ->map(fn ($group): array => [
+                'id' => $group->effective_uom_id,
+                'uom' => $group->uom_code ?: 'Unknown UOM',
+                'rows' => (int) $group->rows_count,
+                'in_count' => (int) $group->in_count,
+                'out_count' => (int) $group->out_count,
+                'in' => (float) $group->total_in,
+                'out' => (float) $group->total_out,
+                'net' => (float) $group->total_in - (float) $group->total_out,
+            ])
+            ->values();
+
+        return [
+            'rows' => $groups->sum('rows'),
+            'in_count' => $groups->sum('in_count'),
+            'out_count' => $groups->sum('out_count'),
+            'uom_count' => $groups->count(),
+            'single_uom' => $groups->count() === 1,
+            'groups' => $groups->all(),
+        ];
+    }
 }

@@ -40,7 +40,7 @@
                 :options="$suppliers->mapWithKeys(fn ($supplier) => [$supplier->id => trim(($supplier->code ? $supplier->code.' - ' : '').$supplier->name)])->all()"
                 all-label="All suppliers"
             />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Apply</button>
+            <button class="button-primary">Apply</button>
             <a href="{{ route('purchase-orders.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Reset</a>
         </x-ui.filter-toolbar>
 

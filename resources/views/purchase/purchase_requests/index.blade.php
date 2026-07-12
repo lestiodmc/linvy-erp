@@ -5,7 +5,7 @@
             subtitle="Request, submit, approve, and convert demand to PO."
         >
             <x-slot:action>
-            <a href="{{ route('purchase-requests.create') }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">New PR</a>
+            <a href="{{ route('purchase-requests.create') }}" class="button-primary">New PR</a>
             </x-slot:action>
         </x-ui.page-header>
     </x-slot>
@@ -26,7 +26,7 @@
                 :options="collect($statuses)->mapWithKeys(fn ($status) => [$status => str($status)->replace('_', ' ')->title()])->all()"
                 all-label="All status"
             />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Apply</button>
+            <button class="button-primary">Apply</button>
             <a href="{{ route('purchase-requests.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Reset</a>
         </x-ui.filter-toolbar>
 

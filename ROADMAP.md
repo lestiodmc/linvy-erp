@@ -9,6 +9,8 @@ Repacking
 BOM
 Yield
 
+Production Formula/BOM Phase 1 is checkpoint-complete. The next approved scope is Production Order Phase 2; warehouse autocomplete remains a non-blocking UI backlog item.
+
 Phase 3
 Sales
 Delivery

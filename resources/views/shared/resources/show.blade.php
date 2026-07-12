@@ -8,7 +8,7 @@
             <div class="flex gap-2">
                 <a href="{{ route($route.'.index') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Back</a>
                 @if(count($fields) > 0)
-                    <a href="{{ route($route.'.edit', $record) }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-emerald-900/10 hover:bg-emerald-700">Edit</a>
+                    <a href="{{ route($route.'.edit', $record) }}" class="button-primary">Edit</a>
                 @endif
             </div>
         </div>

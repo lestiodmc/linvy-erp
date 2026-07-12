@@ -36,7 +36,7 @@
                 default => 'Transactions',
             },
             'purchase' => 'Transactions',
-            'production' => 'Execution',
+            'production' => 'Setup',
             'sales' => 'Transactions',
             'accounting' => 'Configuration',
             'settings' => 'Administration',
@@ -95,7 +95,7 @@
                         class="erp-nav-module group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold {{ $moduleActive($module) ? 'theme-sidebar-surface text-white' : 'theme-sidebar-muted' }}"
                         :class="sidebarCollapsed ? 'justify-center' : 'justify-between'"
                         :title="sidebarCollapsed ? '{{ $module['label'] }}' : ''"
-                        @click="sidebarCollapsed ? sidebarCollapsed = false : openGroups['{{ $moduleKey }}'] = !openGroups['{{ $moduleKey }}']"
+                        @click="sidebarCollapsed ? setSidebar(false) : openGroups['{{ $moduleKey }}'] = !openGroups['{{ $moduleKey }}']"
                     >
                         <span class="flex min-w-0 items-center gap-3">
                             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl {{ $moduleActive($module) ? 'theme-sidebar-active' : 'bg-white/5 theme-sidebar-muted' }}">
@@ -136,7 +136,7 @@
     </nav>
 
     <div class="theme-sidebar sticky bottom-0 z-10 border-t border-white/10 p-3">
-        <button type="button" class="erp-nav-module group relative hidden w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold theme-sidebar-muted lg:flex" :class="sidebarCollapsed ? 'justify-center' : ''" @click="sidebarCollapsed = !sidebarCollapsed" :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'" :title="sidebarCollapsed ? 'Expand Sidebar' : ''">
+        <button type="button" class="erp-nav-module group relative hidden w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold theme-sidebar-muted lg:flex" :class="sidebarCollapsed ? 'justify-center' : ''" @click="setSidebar(!sidebarCollapsed)" :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'" :title="sidebarCollapsed ? 'Expand Sidebar' : ''">
             <span class="grid h-8 w-8 place-items-center rounded-xl bg-white/5">
                 <svg class="h-4 w-4 transition-transform" :class="sidebarCollapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18-6-6 6-6" />

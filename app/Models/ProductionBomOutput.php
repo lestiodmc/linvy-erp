@@ -1,0 +1,3 @@
+<?php
+namespace App\Models; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+class ProductionBomOutput extends Model { public const TYPE_MAIN='MAIN',TYPE_BY_PRODUCT='BY_PRODUCT',TYPE_WASTE='WASTE',TYPES=[self::TYPE_MAIN,self::TYPE_BY_PRODUCT,self::TYPE_WASTE]; protected $guarded=[]; protected $casts=['quantity'=>'decimal:6','sequence'=>'integer']; public function bom():BelongsTo{return $this->belongsTo(ProductionBom::class,'production_bom_id');} public function item():BelongsTo{return $this->belongsTo(Item::class);} public function uom():BelongsTo{return $this->belongsTo(UnitOfMeasure::class);} public function destinationWarehouse():BelongsTo{return $this->belongsTo(Warehouse::class,'destination_warehouse_id');} }

@@ -45,7 +45,7 @@
     @endphp
 
     <div class="mx-auto max-w-screen-2xl space-y-4">
-        <x-ui.filter-toolbar :action="route('inventory.dashboard')" columns="lg:grid-cols-[12rem_12rem_15rem_7rem_6rem]" data-dashboard-filters>
+        <x-filter.panel :action="route('inventory.dashboard')" data-dashboard-filters>
             <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies->pluck('name', 'id')" all-label="All companies" data-company />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches->pluck('name', 'id')" all-label="All branches" data-branch />
             <div>
@@ -57,9 +57,8 @@
                     @endforeach
                 </select>
             </div>
-            <button class="theme-primary theme-focus h-10 rounded-lg px-3 text-sm font-bold">Apply Filters</button>
-            <a href="{{ route('inventory.dashboard') }}" class="theme-surface theme-focus flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-bold">Reset</a>
-        </x-ui.filter-toolbar>
+            <x-slot:actions><button class="button-primary">Apply Filters</button><x-filter.reset :href="route('inventory.dashboard')" /></x-slot:actions>
+        </x-filter.panel>
 
         @foreach($kpiGroups as $group => $cards)
             <section aria-labelledby="{{ \Illuminate\Support\Str::slug($group) }}">

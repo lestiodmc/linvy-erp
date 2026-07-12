@@ -119,7 +119,7 @@
                         <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Transfer Items</p>
                         <h3 class="text-lg font-black text-slate-950">Editable Transfer Grid</h3>
                     </div>
-                    <button type="button" data-add-line class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Add Row</button>
+                    <button type="button" data-add-line class="button-primary">Add Row</button>
                 </div>
 
                 @error('lines')<p class="mx-5 mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{{ $message }}</p>@enderror
@@ -177,7 +177,7 @@
 
             <div class="enterprise-action-bar sticky bottom-0 z-20 rounded-xl backdrop-blur">
                 <a href="{{ route('warehouse-transfers.index') }}" class="rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Cancel</a>
-                <button name="action" value="draft" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">Save Draft</button>
+                <button name="action" value="draft" class="button-primary">Save Draft</button>
                 <button name="action" value="post" data-post-transfer class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">Post Transfer</button>
             </div>
         </form>

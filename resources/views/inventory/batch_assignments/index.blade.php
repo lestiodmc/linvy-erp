@@ -1,14 +1,14 @@
 <x-app-layout>
     <x-slot name="header"><x-ui.page-header title="Batch Assignments" subtitle="Auditable allocation of legacy No Batch stock." /></x-slot>
     <div class="mx-auto max-w-screen-2xl">
-        <x-ui.filter-toolbar :action="route('batch-assignments.index')" columns="lg:grid-cols-[minmax(14rem,1fr)_11rem_11rem_13rem_9rem_7rem_6rem]" data-index-filters>
+        <x-filter.panel :action="route('batch-assignments.index')" data-index-filters>
             <x-ui.search-input :value="$filters['keyword'] ?? ''" />
             <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies->pluck('name','id')" all-label="All companies" data-index-company />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches->pluck('name','id')" all-label="All branches" data-index-branch />
             <div><label class="sr-only" for="warehouse_id">Warehouse</label><select id="warehouse_id" name="warehouse_id" data-index-warehouse class="h-10 w-full rounded-lg border-slate-200 text-sm"><option value="">All warehouses</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse->id }}" @selected((string)($filters['warehouse_id']??'')===(string)$warehouse->id)>{{ $warehouse->branch?->name }} - {{ $warehouse->name }}</option>@endforeach</select></div>
             <x-ui.select-filter name="status" label="Status" :value="$filters['status'] ?? ''" :options="collect($statuses)->mapWithKeys(fn($s)=>[$s=>str($s)->title()])" all-label="All statuses" />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white">Apply</button><a href="{{ route('batch-assignments.index') }}" class="flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-bold">Reset</a>
-        </x-ui.filter-toolbar>
+            <x-slot:actions><button class="button-primary">Apply Filters</button><x-filter.reset :href="route('batch-assignments.index')" /></x-slot:actions>
+        </x-filter.panel>
         <script>
             document.addEventListener('DOMContentLoaded', () => {
                 const form = document.querySelector('[data-index-filters]');

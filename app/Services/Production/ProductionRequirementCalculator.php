@@ -1,0 +1,4 @@
+<?php
+namespace App\Services\Production;
+use App\Models\ProductionBomMaterial; use InvalidArgumentException;
+class ProductionRequirementCalculator { public function calculate(string $materialQuantity,string $previewOutput,string $baseOutput,string $type):string { if(bccomp($baseOutput,'0',6)<=0)throw new InvalidArgumentException('Base output quantity must be greater than zero.'); if($type===ProductionBomMaterial::TYPE_FIXED)return $this->round($materialQuantity); if($type!==ProductionBomMaterial::TYPE_PROPORTIONAL)throw new InvalidArgumentException('Unsupported quantity type.'); return $this->round(bcdiv(bcmul($materialQuantity,$previewOutput,12),$baseOutput,12)); } private function round(string $value):string { $adjust=bccomp($value,'0',12)>=0?'0.0000005':'-0.0000005'; return bcadd($value,$adjust,6); } }

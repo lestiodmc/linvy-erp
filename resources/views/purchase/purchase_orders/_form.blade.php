@@ -85,7 +85,7 @@
             <div class="p-6">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h3 class="text-base font-black text-slate-950">Item Lines</h3>
-                    <button type="button" @click="rows++" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Add Row</button>
+                    <button type="button" @click="rows++" class="button-primary">Add Row</button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
@@ -142,7 +142,7 @@
 
             <div class="enterprise-action-bar sticky bottom-0 z-20">
                 <a href="{{ route('purchase-orders.index') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</a>
-                <button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Save Draft</button>
+                <button class="button-primary">Save Draft</button>
             </div>
         </form>
     </div>

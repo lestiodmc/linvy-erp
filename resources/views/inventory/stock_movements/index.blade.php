@@ -5,28 +5,42 @@
         $dateTime = fn ($value) => $value ? \Illuminate\Support\Carbon::parse($value)->format('d M Y H:i') : '-';
         $date = fn ($value) => $value ? \Illuminate\Support\Carbon::parse($value)->format('d M Y') : '-';
         $cell = 'px-3 py-2'; $head = 'px-3 py-2 text-left text-[11px] font-black uppercase tracking-wide text-slate-500';
-        $summarySuffix = $summary['mixed'] ? ' mixed UOM' : ($summary['uom'] ? ' '.$summary['uom'] : '');
+        $singleUom = $summary['single_uom'] ? $summary['groups'][0] : null;
     @endphp
     <div class="mx-auto max-w-screen-2xl">
-        <x-ui.filter-toolbar :action="route('stock-movements.index')" columns="lg:grid-cols-[minmax(13rem,1.4fr)_10rem_10rem_12rem_minmax(14rem,1.3fr)_10rem_11rem_8rem_12rem_9rem_9rem_7rem_6rem]" data-movement-filters>
+        <x-filter.panel :action="route('stock-movements.index')" data-movement-filters>
             <x-ui.search-input :value="$filters['keyword'] ?? ''" />
             <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies->pluck('name','id')" all-label="All companies" data-company />
             <x-ui.select-filter name="branch_id" label="Branch" :value="$filters['branch_id'] ?? ''" :options="$branches->pluck('name','id')" all-label="All branches" data-branch />
             <div><label class="sr-only" for="warehouse_id">Warehouse</label><select id="warehouse_id" name="warehouse_id" data-warehouse class="h-10 w-full rounded-lg border-slate-200 text-sm"><option value="">All warehouses</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse->id }}" @selected((string)($filters['warehouse_id']??'')===(string)$warehouse->id)>{{ $warehouse->branch?->name }} - {{ $warehouse->name }}</option>@endforeach</select></div>
-            <x-ui.select-filter name="item_id" label="Item" :value="$filters['item_id'] ?? ''" :options="$items" all-label="All items" />
+            <x-filter.field :span="2"><x-ui.select-filter name="item_id" label="Item" :value="$filters['item_id'] ?? ''" :options="$items" all-label="All items" /></x-filter.field>
             <x-ui.select-filter name="batch_no" label="Batch" :value="$filters['batch_no'] ?? '__all'" :options="$batches" all-label="All Batch" />
             <x-ui.select-filter name="transaction_type" label="Transaction Type" :value="$filters['transaction_type'] ?? ''" :options="$movementTypes" all-label="All types" />
             <x-ui.select-filter name="direction" label="Direction" :value="$filters['direction'] ?? ''" :options="$directions" all-label="All directions" />
             <div><label class="sr-only" for="reference">Reference / Document No</label><input id="reference" name="reference" value="{{ $filters['reference'] ?? '' }}" placeholder="Document / reference" class="h-10 w-full rounded-lg border-slate-200 px-3 text-sm"></div>
             <x-ui.date-range :from="$filters['date_from'] ?? ''" :to="$filters['date_to'] ?? ''" />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white">Apply</button><a href="{{ route('stock-movements.index') }}" class="flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-bold">Reset</a>
-        </x-ui.filter-toolbar>
+            <x-slot:actions><button class="button-primary">Apply Filters</button><x-filter.reset :href="route('stock-movements.index')" /></x-slot:actions>
+        </x-filter.panel>
         <div class="mb-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Movement Rows</p><p class="text-lg font-black">{{ number_format($summary['rows']) }}</p><p class="text-[11px] text-slate-500">IN {{ $summary['in_count'] }} · OUT {{ $summary['out_count'] }}</p></div>
-            <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Total In</p><p class="text-lg font-black text-emerald-700">{{ $qty($summary['in']) }}</p><p class="text-[11px] text-slate-500">{{ trim($summarySuffix) ?: '-' }}</p></div>
-            <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Total Out</p><p class="text-lg font-black text-red-700">{{ $qty($summary['out']) }}</p><p class="text-[11px] text-slate-500">{{ trim($summarySuffix) ?: '-' }}</p></div>
-            <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Net Movement</p><p class="text-lg font-black {{ $summary['net'] < 0 ? 'text-red-700' : 'text-slate-900' }}">{{ $qty($summary['net']) }}</p><p class="text-[11px] text-slate-500">{{ trim($summarySuffix) ?: '-' }}</p></div>
+            @if($singleUom)
+                <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Total In</p><p class="text-lg font-black text-emerald-700">{{ $qty($singleUom['in']) }} {{ $singleUom['uom'] }}</p></div>
+                <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Total Out</p><p class="text-lg font-black text-red-700">{{ $qty($singleUom['out']) }} {{ $singleUom['uom'] }}</p></div>
+                <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Net Movement</p><p class="text-lg font-black {{ $singleUom['net'] < 0 ? 'text-red-700' : 'text-slate-900' }}">{{ $qty($singleUom['net']) }} {{ $singleUom['uom'] }}</p></div>
+            @else
+                <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Incoming Transactions</p><p class="text-lg font-black text-emerald-700">{{ number_format($summary['in_count']) }}</p></div>
+                <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">Outgoing Transactions</p><p class="text-lg font-black text-red-700">{{ number_format($summary['out_count']) }}</p></div>
+                <div class="rounded-lg border bg-white px-3 py-2"><p class="text-[10px] font-black uppercase text-slate-500">UOM Groups</p><p class="text-lg font-black">{{ number_format($summary['uom_count']) }}</p></div>
+            @endif
         </div>
+        @if(!$summary['single_uom'] && $summary['groups'])
+            <div class="theme-card mb-2 overflow-x-auto rounded-lg">
+                <div class="border-b px-3 py-2 text-xs font-black uppercase tracking-wide theme-muted">Quantity by UOM</div>
+                <table class="w-full min-w-[32rem] text-xs"><thead class="theme-table-head"><tr><th class="px-3 py-2 text-left">UOM</th><th class="px-3 py-2 text-right">In</th><th class="px-3 py-2 text-right">Out</th><th class="px-3 py-2 text-right">Net</th></tr></thead><tbody>
+                    @foreach($summary['groups'] as $group)<tr class="border-b last:border-0"><td class="px-3 py-2 font-black">{{ $group['uom'] }}</td><td class="px-3 py-2 text-right font-bold text-emerald-700">{{ $qty($group['in']) }}</td><td class="px-3 py-2 text-right font-bold text-red-700">{{ $qty($group['out']) }}</td><td class="px-3 py-2 text-right font-black {{ $group['net'] < 0 ? 'text-red-700' : '' }}">{{ $qty($group['net']) }}</td></tr>@endforeach
+                </tbody></table>
+            </div>
+        @endif
         <x-ui.data-table class="rounded-lg shadow-none"><x-slot:head><tr>@foreach(['Date / Time','Document No','Transaction Type','Direction','Company','Branch','Warehouse','SKU','Item Name','Batch','Expiry','Qty In','Qty Out','UOM','Reference Type','Notes','Action'] as $label)<th class="{{ $head }} whitespace-nowrap {{ in_array($label,['Qty In','Qty Out'])?'text-right':'' }}">{{ $label }}</th>@endforeach</tr></x-slot:head>
         @forelse($records as $record)
             @php($direction = $record->direction())

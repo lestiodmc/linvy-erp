@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="linvy-emerald">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="linvy-emerald" data-mode="light" data-accent="emerald" data-density="comfortable" data-sidebar="expanded">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,12 +9,20 @@
 
         <script>
             (() => {
-                const allowed = ['linvy-emerald', 'ocean-blue', 'royal-purple', 'amber-gold', 'rose-red', 'slate-dark'];
+                const allowed = { mode: ['light','dark','system'], accent: ['emerald','blue','purple','rose','amber','teal','slate'], density: ['comfortable','compact'], sidebar: ['expanded','compact'] };
+                const keys = { mode:'linvy_appearance_mode', accent:'linvy_accent', density:'linvy_density', sidebar:'linvy_sidebar_mode' };
+                const legacy = { 'linvy-emerald':['light','emerald'], 'ocean-blue':['light','blue'], 'royal-purple':['light','purple'], 'amber-gold':['light','amber'], 'rose-red':['light','rose'], 'slate-dark':['dark','blue'] };
                 try {
-                    const saved = localStorage.getItem('linvy_theme');
-                    document.documentElement.dataset.theme = allowed.includes(saved) ? saved : 'linvy-emerald';
+                    const old = legacy[localStorage.getItem('linvy_theme')];
+                    if (old && !localStorage.getItem(keys.mode)) localStorage.setItem(keys.mode, old[0]);
+                    if (old && !localStorage.getItem(keys.accent)) localStorage.setItem(keys.accent, old[1]);
+                    const values = { mode: localStorage.getItem(keys.mode) || 'system', accent: localStorage.getItem(keys.accent) || 'emerald', density: localStorage.getItem(keys.density) || 'comfortable', sidebar: localStorage.getItem(keys.sidebar) || 'expanded' };
+                    Object.keys(values).forEach(key => { if (!allowed[key].includes(values[key])) values[key] = key === 'mode' ? 'system' : key === 'accent' ? 'emerald' : key === 'density' ? 'comfortable' : 'expanded'; });
+                    Object.keys(values).forEach(key => localStorage.setItem(keys[key], values[key]));
+                    const resolved = values.mode === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : values.mode;
+                    Object.assign(document.documentElement.dataset, { mode: resolved, accent: values.accent, density: values.density, sidebar: values.sidebar, theme: resolved === 'dark' ? 'slate-dark' : ({emerald:'linvy-emerald',blue:'ocean-blue',purple:'royal-purple',amber:'amber-gold',rose:'rose-red'}[values.accent] || 'linvy-emerald') });
                 } catch (_) {
-                    document.documentElement.dataset.theme = 'linvy-emerald';
+                    Object.assign(document.documentElement.dataset, { mode:'light', accent:'emerald', density:'comfortable', sidebar:'expanded', theme:'linvy-emerald' });
                 }
             })();
         </script>
@@ -25,7 +33,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
-        <div x-data="{ sidebarOpen: false, sidebarCollapsed: false }" class="min-h-screen">
+        <div x-data="{ sidebarOpen: false, sidebarCollapsed: document.documentElement.dataset.sidebar === 'compact', setSidebar(compact) { this.sidebarCollapsed = compact; window.LinvyAppearance.apply('sidebar', compact ? 'compact' : 'expanded') } }" @linvy-appearance-changed.window="sidebarCollapsed = $event.detail.sidebar === 'compact'" class="min-h-screen">
             <div x-show="sidebarOpen" x-cloak class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" @click="sidebarOpen = false"></div>
 
             @include('layouts.navigation')
@@ -50,14 +58,7 @@
                         </div>
 
                         <div class="flex flex-1 items-center justify-end gap-3">
-                            <div class="hidden w-full max-w-sm lg:block">
-                                <label class="relative block">
-                                    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                                    </span>
-                                    <input type="search" placeholder="Search menu, document, item..." class="theme-surface-secondary block w-full rounded-xl py-2 pl-9 pr-3 text-sm font-medium shadow-sm">
-                                </label>
-                            </div>
+                            <x-command-palette />
 
                             <x-dropdown align="right" width="64">
                                 <x-slot name="trigger">
@@ -81,35 +82,12 @@
                                         <x-dropdown-link :href="route('batch-assignments.create')">New Batch Assignment</x-dropdown-link>
                                     @endif
                                     @if(Auth::user()?->canAccessModule('production') && \App\Support\ModuleManager::enabled('production'))
-                                        <x-dropdown-link :href="route('productions.create')">New Repacking Order</x-dropdown-link>
+                                        <x-dropdown-link :href="route('production-formulas.create')">New Production Formula</x-dropdown-link>
                                     @endif
                                 </x-slot>
                             </x-dropdown>
 
-                            @php
-                                $themeOptions = [
-                                    ['id' => 'linvy-emerald', 'name' => 'Linvy Emerald', 'color' => '#059669'],
-                                    ['id' => 'ocean-blue', 'name' => 'Ocean Blue', 'color' => '#2563eb'],
-                                    ['id' => 'royal-purple', 'name' => 'Royal Purple', 'color' => '#7c3aed'],
-                                    ['id' => 'amber-gold', 'name' => 'Amber Gold', 'color' => '#b45309'],
-                                    ['id' => 'rose-red', 'name' => 'Rose Red', 'color' => '#be123c'],
-                                    ['id' => 'slate-dark', 'name' => 'Slate Dark', 'color' => '#111827'],
-                                ];
-                            @endphp
-                            <div class="relative" x-data="{ open: false, selected: document.documentElement.dataset.theme }" @click.outside="open = false" @keydown.escape.window="open = false">
-                                <button type="button" class="theme-surface theme-focus grid h-10 w-10 place-items-center rounded-xl border shadow-sm" @click="open = !open" :aria-expanded="open" aria-haspopup="listbox" aria-label="Choose application theme">
-                                    <svg class="h-5 w-5 theme-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 0-3.6h-.6a1.5 1.5 0 0 1 0-3H15a6 6 0 0 0 0-12h-3Zm-4 6h.01M11 6h.01M6 13h.01" /></svg>
-                                </button>
-                                <div x-show="open" x-cloak x-transition class="theme-dropdown absolute right-0 z-50 mt-2 w-56 rounded-xl p-1.5 shadow-xl" role="listbox" aria-label="Application themes">
-                                    @foreach($themeOptions as $theme)
-                                        <button type="button" class="theme-option theme-focus flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm" @click="selected = window.LinvyTheme.apply('{{ $theme['id'] }}'); open = false" role="option" :aria-selected="selected === '{{ $theme['id'] }}'">
-                                            <span class="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style="background: {{ $theme['color'] }}"></span>
-                                            <span class="flex-1 font-semibold">{{ $theme['name'] }}</span>
-                                            <svg x-show="selected === '{{ $theme['id'] }}'" class="h-4 w-4 theme-link" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 12 4 4L19 6" /></svg>
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
+                            <x-appearance-panel />
 
                             <button type="button" class="theme-surface theme-focus relative grid h-10 w-10 place-items-center rounded-xl border shadow-sm">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 1 1-6 0m6 0H9" /></svg>

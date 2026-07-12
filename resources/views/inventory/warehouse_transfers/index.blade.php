@@ -18,10 +18,7 @@
     <div class="mx-auto max-w-screen-2xl">
         @include('purchase.shared.flash')
 
-        <x-ui.filter-toolbar
-            :action="route('warehouse-transfers.index')"
-            columns="lg:grid-cols-[minmax(13rem,1.4fr)_9rem_9rem_minmax(9rem,1fr)_minmax(9rem,1fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_10rem_7rem_6rem]"
-        >
+        <x-filter.panel :action="route('warehouse-transfers.index')">
             <x-ui.search-input :value="$filters['keyword'] ?? ''" />
             <x-ui.date-range :from="$filters['date_from'] ?? ''" :to="$filters['date_to'] ?? ''" />
             <x-ui.select-filter name="company_id" label="Company" :value="$filters['company_id'] ?? ''" :options="$companies" all-label="All companies" />
@@ -29,9 +26,8 @@
             <x-ui.warehouse-filter :warehouses="$warehouses" name="from_warehouse_id" label="From Warehouse" :value="$filters['from_warehouse_id'] ?? ''" all-label="All from warehouses" />
             <x-ui.warehouse-filter :warehouses="$warehouses" name="to_warehouse_id" label="To Warehouse" :value="$filters['to_warehouse_id'] ?? ''" all-label="All to warehouses" />
             <x-ui.select-filter name="status" label="Status" :value="$filters['status'] ?? ''" :options="$statuses" all-label="All status" />
-            <button class="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">Apply</button>
-            <a href="{{ route('warehouse-transfers.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Reset</a>
-        </x-ui.filter-toolbar>
+            <x-slot:actions><button class="button-primary">Apply Filters</button><x-filter.reset :href="route('warehouse-transfers.index')" /></x-slot:actions>
+        </x-filter.panel>
 
         <x-ui.data-table class="rounded-lg shadow-none">
             <x-slot:head>

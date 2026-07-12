@@ -1,0 +1,13 @@
+<?php
+namespace App\Models;
+use Illuminate\Database\Eloquent\Builder; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\{BelongsTo,HasMany};
+class ProductionBom extends Model {
+    public const TYPE_STANDARD='STANDARD', TYPE_REPACKING='REPACKING'; public const TYPES=[self::TYPE_STANDARD,self::TYPE_REPACKING];
+    public const STATUS_DRAFT='draft', STATUS_ACTIVE='active', STATUS_INACTIVE='inactive', STATUS_OBSOLETE='obsolete'; public const STATUSES=[self::STATUS_DRAFT,self::STATUS_ACTIVE,self::STATUS_INACTIVE,self::STATUS_OBSOLETE];
+    protected $guarded=[]; protected $casts=['base_output_quantity'=>'decimal:6','version'=>'integer','effective_from'=>'date','effective_to'=>'date','activated_at'=>'datetime','inactivated_at'=>'datetime'];
+    public function company():BelongsTo{return $this->belongsTo(Company::class);} public function branch():BelongsTo{return $this->belongsTo(Branch::class);} public function finishedItem():BelongsTo{return $this->belongsTo(Item::class,'finished_item_id');}
+    public function outputUom():BelongsTo{return $this->belongsTo(UnitOfMeasure::class,'output_uom_id');} public function defaultSourceWarehouse():BelongsTo{return $this->belongsTo(Warehouse::class,'default_source_warehouse_id');} public function defaultDestinationWarehouse():BelongsTo{return $this->belongsTo(Warehouse::class,'default_destination_warehouse_id');}
+    public function materials():HasMany{return $this->hasMany(ProductionBomMaterial::class)->orderBy('sequence');} public function outputs():HasMany{return $this->hasMany(ProductionBomOutput::class)->orderBy('sequence');}
+    public function activatedBy():BelongsTo{return $this->belongsTo(User::class,'activated_by');} public function inactivatedBy():BelongsTo{return $this->belongsTo(User::class,'inactivated_by');} public function createdBy():BelongsTo{return $this->belongsTo(User::class,'created_by');} public function updatedBy():BelongsTo{return $this->belongsTo(User::class,'updated_by');}
+    public function scopeAccessibleTo(Builder $q,User $u):Builder{if($u->isSuperAdmin())return $q;$branches=$u->branches()->get(['branches.id','company_id']);return $q->whereIn('company_id',$branches->pluck('company_id')->unique())->where(fn(Builder $x)=>$x->whereNull('branch_id')->orWhereIn('branch_id',$branches->pluck('id')));} public function scopeActive(Builder $q):Builder{return $q->where('status',self::STATUS_ACTIVE);} public function scopeEffectiveOn(Builder $q,$date):Builder{return $q->where(fn($x)=>$x->whereNull('effective_from')->orWhereDate('effective_from','<=',$date))->where(fn($x)=>$x->whereNull('effective_to')->orWhereDate('effective_to','>=',$date));}
+}

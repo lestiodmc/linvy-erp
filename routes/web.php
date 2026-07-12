@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeliveryOrderController;
 use App\Http\Controllers\Admin\DocumentSequenceController;
+use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\ItemLedgerController;
 use App\Http\Controllers\Admin\InventoryDashboardController;
 use App\Http\Controllers\Admin\ItemCategoryController;
@@ -19,7 +20,7 @@ use App\Http\Controllers\Admin\ModuleSettingController;
 use App\Http\Controllers\Admin\PaymentTermController;
 use App\Http\Controllers\Admin\PurchaseRequestController;
 use App\Http\Controllers\Admin\PurchaseLookupController;
-use App\Http\Controllers\Admin\ProductionController;
+use App\Http\Controllers\Admin\ProductionBomController;
 use App\Http\Controllers\Admin\PurchaseOrderController;
 use App\Http\Controllers\Admin\ReceivingController;
 use App\Http\Controllers\Admin\RoleController;
@@ -44,6 +45,8 @@ Route::get('/', function () {
 Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified', 'module:dashboard'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('global-search', GlobalSearchController::class)->middleware('throttle:60,1')->name('global-search');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -122,7 +125,12 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('module:production')->group(function () {
-        Route::resource('productions', ProductionController::class)->parameters(['productions' => 'record']);
+        Route::get('production/formulas/items', [ProductionBomController::class, 'items'])->name('production-formulas.items');
+        Route::post('production/formulas/{formula}/activate', [ProductionBomController::class, 'activate'])->name('production-formulas.activate');
+        Route::post('production/formulas/{formula}/inactivate', [ProductionBomController::class, 'inactivate'])->name('production-formulas.inactivate');
+        Route::post('production/formulas/{formula}/obsolete', [ProductionBomController::class, 'obsolete'])->name('production-formulas.obsolete');
+        Route::post('production/formulas/{formula}/clone', [ProductionBomController::class, 'clone'])->name('production-formulas.clone');
+        Route::resource('production/formulas', ProductionBomController::class)->except(['destroy'])->parameters(['formulas' => 'formula'])->names('production-formulas');
     });
 
     Route::middleware('module:sales')->group(function () {
